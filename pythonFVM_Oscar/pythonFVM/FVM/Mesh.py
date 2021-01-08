@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """ 
-@author: jose
+@author: José ft. Óscar
 """
 
 import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
-from mpl_toolkits.mplot3d import Axes3D
-from itertools import product
+import plotly.graph_objects as go
 
 class Mesh():
     """
@@ -102,11 +99,8 @@ class Mesh():
         self.__deltas = [(0,) for _ in range(3)]
         # Hasta aquí tenemos un cubito
 
-        self.__dirichTagDict = {} # No importa por ahora
-        self.__neumTagDict = {}   # No importa por ahora
-        self.__sourcTagDict = {}  # No importa por ahora
-        self.__tags = {} # El etiquetado de todos los nodos
-        self.__tags_f = {} # El etiquetado de las caras entre volúmenes
+        self.__tags = {} # El etiquetado de todos los nodos sin fronteras
+        self.__tags_fronteras = {} # El etiquetado de las fornteras
 
         self.__autoMesh = True      # Al parecer es una bandera para calcular la posición de los nodos atmte
         self.__emptyCoord = True    # Nos dice si las coordenadas del dominio (self.__coords_dom) están guardadas
@@ -131,26 +125,8 @@ class Mesh():
         # if volumes and lengths are given, initialize values acording to dimension
         if (volumes and lengths):       
             self.uniformGrid()
-            dom_nodes = self.totalDomNodes()
             self.init_tags()
-            #Nx, Ny, Nz = [len(dom) for dom in self.__dominios]
-#
-            #self.__hasWallW =[1 + j*Nx + k*Nx*Ny for k, j in product(range(1, Nz-1), range(1, Ny-1))]
-            #self.__hasWallE =[Nx-2 + j*Nx + k*Nx*Ny for k, j in product(range(1, Nz-1),range(1, Ny-1))]
-            
-            #if self.__dim > 1:
-            #    self.__hasWallS =[i+(1)*Nx+k*Nx*Ny for k,i in product(range(1,Nz-1),range(1,Nx-1))]
-            #    self.__hasWallN =[i+(Ny-2)*Nx+k*Nx*Ny for k,i in product(range(1,Nz-1),range(1,Nx-1))]
-            #else:
-            #    self.__hasWallS =[]
-            #    self.__hasWallN =[]
-                
-            #if self.__dim > 2:
-            #    self.__hasWallB =[i+j*Nx+(1)*Nx*Ny for j,i in product(range(1,Ny-1),range(1,Nx-1))]
-            #    self.__hasWallT =[i+j*Nx+(Nz-2)*Nx*Ny for j,i in product(range(1,Ny-1),range(1,Nx-1))]
-            #else:
-            #    self.__hasWallB =[]
-            #    self.__hasWallT =[]
+            self.init_tags_fronteras()
     
     
     def uniformGrid(self):
@@ -163,18 +139,52 @@ class Mesh():
         dominios = [np.insert(arr,(0,len(arr)),[0, l[idx]]) for idx, arr in enumerate(self.__coords)] # Coordenadas + fronteras
         self.__deltas = [self.setDeltas(dom)  if len(self.setDeltas(dom)) != 0 else (dom[-1],) for dom in dominios]  # Separación entre los nodos (Aquí hay que ver cómo es cuando tenemos un grid de 2x1x1 ya cuando se haga el FVM
         self.__dominios = [tuple(dom) for dom in dominios]
-        self.__faces = [tuple(np.array(self.__deltas[idx]) + self.__lengths[idx]) for idx, coord in enumerate(self.__coords)]
+        self.__faces = [tuple((np.array(coords[:-1]) + np.array(coords[1:]))/2) for coords in self.__coords]
+    
     
     def setDeltas(self, dominio):
         return tuple((dominio[1:]-dominio[:-1])[1:-1])
     
     
-    def totalDomNodes(self):
-        d_1 = 6*self.__volumes[0] + 1
-        d_2 = self.__volumes[1]*d_1 - self.__volumes[0]*(self.__volumes[1] - 1)
-        d_3 = self.__volumes[2]*d_2 - self.__volumes[0]*self.__volumes[1]*(self.__volumes[2] - 1)
-        return d_3
+    # Creo que esto no se usará, pero estuvo chida la deducción, lo dejo de todos modos xd
+    #def totalDomNodes(self):
+    #    d_1 = 6*self.__volumes[0] + 1
+    #    d_2 = self.__volumes[1]*d_1 - self.__volumes[0]*(self.__volumes[1] - 1)
+    #    d_3 = self.__volumes[2]*d_2 - self.__volumes[0]*self.__volumes[1]*(self.__volumes[2] - 1)
+    #    return d_3
     
+    def init_tags_fronteras(self):
+        X, Y, Z = [len(dom) for dom in self.__dominios]
+        for z in range(Z):
+            for y in range(Y):
+                for x in range(X):
+                    t = b = n = s = "Off"
+                    e = w = "ON"
+                    if self.__dim > 1: 
+                        n = s = "ON"
+                        if self.__dim == 3: t = b = "ON"
+                    # El siguiente cacho de código es para saber si nos encontramos con una frontera
+                    if x==0 or y==0 or z==0 or x==(X-1) or y==(Y-1) or z==(Z-1):
+                        var = None
+                        if y != 0 and y != (Y - 1):
+                            if z != 0 and z != (Z - 1):
+                                if x == 0: var = "W"; value = w
+                                elif x == (X - 1): var = "E"; value = e
+                                else: continue
+                            elif x != 0 and x != (X - 1):
+                                if z == 0: var = "B"; value = b
+                                elif z == (Z - 1): var = "T"; value = t
+                                else: continue
+                            else: continue
+                            self.__tags_fronteras[f"{x}{y}{z}"] = {"frontera": {var: value},
+                                                 "coord": [self.__dominios[0][x], self.__dominios[1][y], self.__dominios[2][z]]} 
+                        elif z != 0 and z != (Z - 1):
+                            if x != 0 and x != (X - 1):
+                                if y == 0: var = "S"; value = s
+                                elif y == (Y - 1) : var = "N"; value = n
+                                self.__tags_fronteras[f"{x}{y}{z}"] = {"frontera": {var: value},
+                                                 "coord": [self.__dominios[0][x], self.__dominios[1][y], self.__dominios[2][z]]} 
+                        else: continue
     
     def init_tags(self):
         """
@@ -183,216 +193,65 @@ class Mesh():
         problema. 
         """
         X, Y, Z = self.__volumes
-        for z in range(Z):
-            for y in range(Y):
-                for x in range(X):
+        for z in range(1,Z+1):
+            for y in range(1,Y+1):
+                for x in range(1,X+1):                   
                     t = b = n = s = "Off"
                     e = w = "F"
-                    if x == 0: e = 0
-                    elif x == X - 1: w = 0
+                    if x == 1: w = {}
+                    elif x == X: e = {}
                     if self.__dim > 1:
                         n = s = "F"
-                        if y == 0: s = 0
-                        elif y == Y - 1: n = 0
+                        if y == 1: s = {}
+                        elif y == Y: n = {}
                         if self.__dim == 3:
                             t = b = "F"
-                            if z == 0: b = 0
-                            elif z == Z - 1: t = 0
-                            
-                    self.__tags[f"{x}{y}{z}"] = {"E": e, "W": w, "N": n, "S": s, "T": t, "B": b}
+                            if z == 1: b = {}
+                            elif z == Z: t = {}
+
+                    self.__tags[f"{x}{y}{z}"] = {"E": e, "W": w, "N": n, "S": s, "T": t, "B": b, 
+                                             "coord": [self.__dominios[0][x], self.__dominios[1][y], self.__dominios[2][z]]}
             
-    
-    def tagWestWall(self, tag, value):
-        """
-        This method defines the West Wall border condition.
-        This is done by getting the instance attibute 'tags' and setting it's elements 
-        equal to the 'tag' given. In this process, just the elements corresponding
-        to the West Wall are modified.
-        The tag must begin with a D,N or S as this represent a dirichlet, neumman or 
-        source node; accordingly. For instance, a border that doesn't allow any flux
-        of the scalar propertie can be setted using a 'tag' like N1 or N5 or N30 or
-        etc., with a value of zero, that is, a Neumann condition of 0.
-        
-        tag: string begiinning with D, N or S to represent a dirichlet, neumann or source node (string).
-        value: value of the corresponding border condition (float)
-        """
-        
-        
-        self.allocValue(tag,value)
-        
-        Nx = self.__volumes[0] + 2
-        Ny = self.__volumes[1] + 2
-        Nz = self.__volumes[2] + 2
-        tags = self.__tags
-        i = 0
-        for k in range(Nz):
-            for j in range(Ny):
-                global_index = i + j*Nx + k*Nx*Ny
-                tags[global_index] = tag
-        
-    
-    def tagEastWall(self,tag,value):
-        """This method defines the East Wall border condition.
-        This is done by getting the instance attibute 'tags' and setting it's elements 
-        equal to the 'tag' given. In this process, just the elements corresponding
-        to the East Wall are modified.
-        The tag must begin with a D,N or S as this represent a dirichlet, neumman or 
-        source node; accordingly. For instance, a border that doesn't allow any flux
-        of the scalar propertie can be setted using a 'tag' like N1 or N5 or N30 or
-        etc., with a value of zero, that is, a Neumann condition of 0.
-        
-        tag: string begiinning with D, N or S to represent a dirichlet, neumann or source node (string).
-        value: value of the corresponding border condition (float) """
+    def tagWall(self, direction, tag, value, coords=None):
+        if isinstance(direction, str):
+            for key in self.__tags.keys():
+                if isinstance(self.__tags[key][direction], dict):
+                    self.__tags[key][direction][tag] = value
+            for key in self.__tags_fronteras.keys():
+                if list(self.__tags_fronteras[key]["frontera"].keys())[0] == direction:
+                    if self.__tags_fronteras[key]["frontera"][direction] == "ON":
+                        self.__tags_fronteras[key]["frontera"][direction] = {tag: value}
+                    
+        if coords:
+            for idx, key in enumerate(coords):
+                if key in list(self.__tags.keys()):
+                    self.__tags[key][direction[idx]][tag[idx]] = value[idx]
+                elif key in list(self.__tags_fronteras.keys()):
+                    self.__tags_fronteras[key]["frontera"][direction[idx]] = {tag[idx]: value[idx]}
                 
-        self.allocValue(tag,value)
-        
-        Nx = self.__volumes[0]+2
-        Ny = self.__volumes[1]+2
-        Nz = self.__volumes[2]+2
-        tags=self.__tags
-        i=Nx-1
-        for k in range(Nz):
-            for j in range(Ny):
-                global_index = i + j*Nx + k*Nx*Ny
-                tags[global_index]=tag
-
-    def tagSouthWall(self,tag,value):
-        """This method defines the South Wall border condition.
-        This is done by getting the instance attibute 'tags' and setting it's elements 
-        equal to the 'tag' given. In this process, just the elements corresponding
-        to the South Wall are modified.
-        The tag must begin with a D,N or S as this represent a dirichlet, neumman or 
-        source node; accordingly. For instance, a border that doesn't allow any flux
-        of the scalar propertie can be setted using a 'tag' like N1 or N5 or N30 or
-        etc., with a value of zero, that is, a Neumann condition of 0.
-        
-        tag: string begiinning with D, N or S to represent a dirichlet, neumann or source node (string).
-        value: value of the corresponding border condition (float) """
-        
-        
-        self.allocValue(tag,value)
-        
-        Nx = self.__volumes[0]+2
-        Ny = self.__volumes[1]+2
-        Nz = self.__volumes[2]+2
-        tags=self.__tags
-        j=0
-        for k in range(Nz):
-            for i in range(Nx):
-                global_index = i + j*Nx + k*Nx*Ny
-                tags[global_index]=tag
-                
-    def tagNorthWall(self,tag,value):
-        """This method defines the North Wall border condition.
-        This is done by getting the instance attibute 'tags' and setting it's elements 
-        equal to the 'tag' given. In this process, just the elements corresponding
-        to the North Wall are modified.
-        The tag must begin with a D,N or S as this represent a dirichlet, neumman or 
-        source node; accordingly. For instance, a border that doesn't allow any flux
-        of the scalar propertie can be setted using a 'tag' like N1 or N5 or N30 or
-        etc., with a value of zero, that is, a Neumann condition of 0.
-        
-        tag: string begiinning with D, N or S to represent a dirichlet, neumann or source node (string).
-        value: value of the corresponding border condition (float) """
-        
-        self.allocValue(tag,value)
-        
-        Nx = self.__volumes[0]+2
-        Ny = self.__volumes[1]+2
-        Nz = self.__volumes[2]+2
-        tags=self.__tags
-        j=Ny-1
-        for k in range(Nz):
-            for i in range(Nx):
-                global_index = i + j*Nx + k*Nx*Ny
-                tags[global_index]=tag
-                
-    def tagBottomWall(self,tag,value):
-        """This method defines the Bottom Wall border condition.
-        This is done by getting the instance attibute 'tags' and setting it's elements 
-        equal to the 'tag' given. In this process, just the elements corresponding
-        to the Bottom Wall are modified.
-        The tag must begin with a D,N or S as this represent a dirichlet, neumman or 
-        source node; accordingly. For instance, a border that doesn't allow any flux
-        of the scalar propertie can be setted using a 'tag' like N1 or N5 or N30 or
-        etc., with a value of zero, that is, a Neumann condition of 0.
-        
-        tag: string begiinning with D, N or S to represent a dirichlet, neumann or source node (string).
-        value: value of the corresponding border condition (float) """
-                
-        self.allocValue(tag,value)
-        
-        Nx = self.__volumes[0]+2
-        Ny = self.__volumes[1]+2
-        tags=self.__tags
-        k=0
-        for j in range(Ny):
-            for i in range(Nx):
-                global_index = i + j*Nx + k*Nx*Ny
-                tags[global_index]=tag
-
-    def tagTopWall(self,tag,value):
-        """This method defines the Top Wall border condition.
-        This is done by getting the instance attibute 'tags' and setting it's elements 
-        equal to the 'tag' given. In this process, just the elements corresponding
-        to the Top Wall are modified.
-        The tag must begin with a D,N or S as this represent a dirichlet, neumman or 
-        source node; accordingly. For instance, a border that doesn't allow any flux
-        of the scalar propertie can be setted using a 'tag' like N1 or N5 or N30 or
-        etc., with a value of zero, that is, a Neumann condition of 0.
-        
-        tag: string begiinning with D, N or S to represent a dirichlet, neumann or source node (string).
-        value: value of the corresponding border condition (float) """
-                
-        self.allocValue(tag,value)
-        
-        Nx = self.__volumes[0]+2
-        Ny = self.__volumes[1]+2
-        Nz = self.__volumes[2]+2
-        tags=self.__tags
-        k=Nz-1
-        for j in range(Ny):
-            for i in range(Nx):
-                global_index = i + j*Nx + k*Nx*Ny
-                tags[global_index]=tag  
     
     
-    def setDominio(self, dominio):
+    def setDominio(self, dominio, faces=None):
         
         self.__autoMesh = False # La posición de los nodos no se calcula en automático
         
-        # Si 'dominio' no es tupla transforma 'dominio' a la tupla unidimensional (dominio,)
+        # Si 'dominio' no es tupla, transforma 'dominio' a la tupla unidimensional (dominio,)
         # Tendría que ser una tupla de tuplas/listas/arreglos para que sea válido.
-        if not isinstance(dominio, tuple):
-            tupla = (dominio,)
+        if not isinstance(dominio, (tuple, int, float)): # Creo que si es una lista o un arreglo, no funciona enteros o float
+            tupla = (tuple(dominio), self.__dominios[1], self.__dominios[2])
             dominio = tupla
         # Asigna los atributos de la mesh correspondientes    
-        self.__dominios = [tuple(dominio[i]) for i in range(self.__dim)]
-        self.__coords = [tuple(dominio[i][1:-1]) for i in range(self.__dim)]
-        self.__lengths = [tuple(dominio[i][-1]) for i in range(self.__dim)]
-        self.__volumes = [len(dominio[i][1:-1]) for i in range(self.__dim)]
-        self.__deltas = [self.setDeltas(dominio[i]) for i in range(self.__dim)]
+        self.__dominios = [tuple(dominio[i]) for i in range(3)]
+        self.__coords = [tuple(dominio[i][1:-1]) for i in range(3)]
+        self.__lengths = tuple([dominio[i][-1] for i in range(3)])
+        self.__volumes = tuple([len(dominio[i][1:-1]) for i in range(3)])
+        self.__deltas = [self.setDeltas(np.array(dominio[i])) for i in range(3)]
+        
+        if faces: self.__faces = faces
+        else: self.__faces = [tuple((np.array(coords[:-1]) + np.array(coords[1:]))/2) for coords in self.__coords]
             
-        dom_nodes = self.totalDomNodes()
-        self.__tags = ["I" for i in range(dom_nodes)]
-        self.tagsWallsOff()
-        
-        #Nx, Ny, Nz = [len(dom) for dom in self.__dominios]
-        #self.__hasWallW =[1+j*Nx+k*Nx*Ny for k,j in product(range(1,Nz-1),range(1,Ny-1))]
-        #self.__hasWallE =[Nx-2+j*Nx+k*Nx*Ny for k,j in product(range(1,Nz-1),range(1,Ny-1))]
-        #if self.__dim > 1:
-        #    self.__hasWallS =[i+(1)*Nx+k*Nx*Ny for k,i in product(range(1,Nz-1),range(1,Nx-1))]
-        #    self.__hasWallN =[i+(Ny-2)*Nx+k*Nx*Ny for k,i in product(range(1,Nz-1),range(1,Nx-1))]
-        #else:
-        #    self.__hasWallS =[]
-        #    self.__hasWallN =[]
-        
-        #if self.__dim > 2:    
-        #    self.__hasWallB =[i+j*Nx+(1)*Nx*Ny for j,i in product(range(1,Ny-1),range(1,Nx-1))]
-        #    self.__hasWallT =[i+j*Nx+(Nz-2)*Nx*Ny for j,i in product(range(1,Ny-1),range(1,Nx-1))]
-        #else:
-        #    self.__hasWallB =[]
-        #    self.__hasWallT =[]
+        self.init_tags()
+        self.init_tags_fronteras()
     
     
     def info(self):
@@ -411,472 +270,23 @@ class Mesh():
             print(f"List of {var.lower()} positions of volumes: \n{self.__coords[idx]}")
             print(f"List of {var.lower()} positions of domain nodes: \n{self.__dominios[idx]}")
             
-
-    def createCoord(self):
-        """
-        Create and stores the nodes coordinates
-        """
-        self.__emptyCoord = False # Sigo sin saber para qué sirve
-
-        domX, domY, domZ = [dom for dom in self.__dominios]
-        self.__coords_dom = [coord_dom.flatten() for coord_dom in np.meshgrid(domY, domZ, domX)]
-        
-        
-    def delCoor(self):
-        """
-        Deletes the coordX, coordY and coordZ attributes
-        """
-        del(self.__coords_dom)
-        
-        
-    def getCoord(self):
-        """
-        Get the nodes coordinates
-        """
-        if self.__emptyCoord: # Check if the coordinates are stored
-            self.createCoords()
-            coord = self.__coords_dom
-        else:
-            coord = self.__coords_dom
-        return coord
-        
-        
-    def coordList(self):
-        """
-        Get the coordinates in a printable fashion
-        """
-        coordX, coordY, coordZ = self.getCoord()
-        coordList = np.transpose([coordX, coordY, coordZ]) # No estoy seguro si esto sirva, está raro
-        return coordList
-    
-    def coordTags(self):
-        """
-        Get the nodes coordinates and it's respective tag
-        """
-        coordX, coordY, coordZ = self.getCoord()
-        coordTags = (coordX, coordY, coordZ, self.__tags) # La notación de los tags está rara, hacer diccionario
-        
-        return coordTags
-    
-    def printCoordTags(self, includeOffs = False):
-        """
-        Method that gets the nodes coordinates and their respective tags and prints 
-        them. For clarity, it won't print more than 400 nodes and the nodes with 'off'
-        tags are not included by default. The off nodes can be included by setting
-        includeOffs to True.
-        
-        incudeOffs: parameter used to show the nodes with 'off' tags (True/False)
-        """
-        
-        (X, Y, Z, tags) = self.coordTags()
-        Nx, Ny, Nz = [len(dom) for dom in self.__dominios]
-        
-        if len(X) < 400:
-            print("The coordinates and tags are:")
-            if includeOffs or self.__dim == 3:
-                for i in range(len(X)): print(f"({X[i]:.3f},{Y[i]:.3f},{Z[i]:.3f}):{tags[i]}")
             
-            else:
-                if self.__dim ==1:
-                    node_1st = Nx*Ny + Nx # First node that is used for that dimension
-                    (X, tags) = (X[node_1st:node_1st + Nx], tags[node_1st:node_1st + Nx])
-                    for i in range(len(X)): print(f"({X[i]:.3f}):{tags[i]}")
-                elif self.__dim == 2:
-                    node_1st = Nx*Ny #first node that is used for that dimension
-                    (X, Y, tags) = (X[node_1st:node_1st + Nx*Ny], Y[node_1st:node_1st + Nx*Ny], 
-                                    tags[node_1st:node_1st + Nx*Ny])
-                    for i in range(len(X)): print(f"({X[i]:.3f},{Y[i]:.3f}):{tags[i]}")
-        else: print("Too many nodes (>400) to print")
-                
-    
-    def allocValue(self, tag, value):
-        """
-        Takes the 'tag'  and sets it as a key for the 'value' in the corresponding
-        dictionary. If the tag begins with a D,N or S it's placed in the dirichlet, 
-        neumman or source dictionary; accordingly. For instance, a border that doesn't allow
-        any flux of the scalar propertie can be setted using a 'tag' like N1 or N5 or N30 or
-        etc., with a value of zero, that is, a Neumann condition of 0.
-        
-        tag: string beginning with D, N or S to represent a dirichlet, neumann or source node (string).
-        value: value of the corresponding boundary condition (float)
-        """
-        
-        dirich = self.__dirichTagDict 
-        neum = self.__neumTagDict
-        sourc = self.__sourcTagDict
-        if tag[0] == 'D': dirich[tag] = value
-        elif tag[0] == 'N': neum[tag] = value
-        elif tag[0] == 'S': sourc[tag] = value
-                    
-                    
-    def setUsrTag(self,usrTag,usrValue,x_lim,y_lim=(1.,1.),z_lim=(1.,1.)):
-        """ Sets a tag (usrTag) and it's value (usrValue) for all the nodes inside 
-        a given rectangular prism. The rectangular prism is specified via the 
-        minimum x, maximum x, minimum y, maximum y, minimum z, maximum z that the 
-        prism intersects.
-        
-        maximum x - minimum x = length of the prism
-        maximum y - minimum y = width of the prism
-        maximum z - minimum z = height of the prism
-        
-        If the values of Z aren't given then the figure is a rectangle instead of a prism.
-        If only the X values are given then the figure is a segment instead of a prism
-        
-        usrTag: Tag to be setted, must begin with D,N or S to represent dirichlet, neumann, or source node (string)
-        usrValue: The corresponding value of the tag to be setted (float)
-        x_lim: A tuple that contains minimum x and maximum x, in that order (tuple of floats)
-        y_lim: A tuple that contains minimum y and maximum y, in that order (tuple of floats)
-        z_lim: A tuple that contains minimum z and maximum z, in that order (tuple of floats)
-        """
-        self.allocValue(usrTag,usrValue)
-        
-        Nx = self.__volumes[0]+2
-        Ny = self.__volumes[1]+2
-        Nz = self.__volumes[2]+2
-        tags=self.__tags
-        
-        x1, x2 = x_lim
-        y1, y2 = y_lim
-        z1, z2 = z_lim
-        x1_index = np.argmax(x1<= self.__dominioX) # primer índice que cumple x>x1
-        x2_index = Nx-np.argmax( np.flip(self.__dominioX<=x2) ) #último índice +1  que cumple x<x2
-        y1_index = np.argmax(y1<= self.__dominioY)
-        y2_index = Ny-np.argmax( np.flip(self.__dominioY<=y2) )
-        z1_index = np.argmax(z1<= self.__dominioZ)
-        z2_index = Nz-np.argmax( np.flip(self.__dominioZ<=z2) )
+    def draw(self):
+        dic_colors = {"D": "gold", "N": "blue", "S": "magenta"}
+        lim_izquierdo = [list(self.__tags[key]["E"].keys())[0] for key in self.__tags if isinstance(self.__tags[key]["E"], dict)]
+        lim_derecho = [list(self.__tags[key]["W"].keys())[0] for key in self.__tags if isinstance(self.__tags[key]["W"], dict)]
+        colores =  [dic_colors[lim] for lim in lim_izquierdo] + ["black" for _ in self.__coords[0]] + [dic_colors[lim] for lim in limite_derecho]
+        marcadores = ["square"] + [0 for _ in self.__coords[0]] + ["square"]
+        #fig = go.Figure(data = go.Scatter(x = self.__dominios[0], y = np.zeros(len(self.__dominios[0])), 
+        #                                      mode = 'markers', marker = dict(color = colores, symbol = marcadores, size = 10)))
 
-        for k in range(z1_index,z2_index):
-            for j in range(y1_index,y2_index):
-                for i in range(x1_index,x2_index):
-                    global_index = i + j*Nx + k*Nx*Ny
-                    tags[global_index]=usrTag
-                    
-    def tagByCond(self,usrTag,usrValue,cond_func):
-        
-        """ Sets a tag 'usrTag' and it's value 'usrValue' for all the nodes in 
-        the domain that satisfies the condition definded by the function 'cond_func'.
-        The 'cond_func' function must accept three parameters x,y,z and return a 
-        True/False value. 
-        
-        f(x,y,z)  -----> True / False
-        
-        usrTag: Tag to be setted, must begin with D,N or S to represent dirichlet, neumann, or source node (string)
-        usrValue: The corresponding value of the tag to be setted (float)
-        cond_func: function to avaluate wheter the node positions satisfies the condition or not (function)
-        """
-        
-        self.allocValue(usrTag,usrValue)
-        
-        Nx = self.__volumes[0]+2 ; Ny = self.__volumes[1]+2 ; Nz = self.__volumes[2]+2
-        X = self.__dominioX ; Y = self.__dominioY ; Z = self.__dominioZ
-        tags=self.__tags
-        
-        for k in range(Nz):
-            for j in range(Ny):
-                for i in range(Nx):
-                    x=X[i] ; y = Y[j] ; z= Z[k]
-                    if cond_func(x,y,z):
-                        global_index = i + j*Nx + k*Nx*Ny
-                        tags[global_index]=usrTag
-        
-        
-                    
-    def unkown_mesh_indx(self):
-        """Returns the indexes of all the nodes that doesn't have a boundary condition,
-        that is, all the indexes corresponding to an I or S tag."""
-        tags=self.__tags
-        tags_serie=pd.Series(tags)
-        bool_cond=tags_serie.str.contains('I|S', regex=True) #serie de pandas booleana que tiene True para los indices con I o S
-        unkown_mesh_indx=tags_serie[bool_cond].index
-        return unkown_mesh_indx
-    
-    
-    def meshIndx_ijk(self,meshIndx):
-        """Takes a given node index 'meshIndx', and returns the three-dimensionals
-        triple i,j,k indexes. For instance the second node has index equal to one so 
-        meshIndx_ijk(1) should return (1,0,0)
-        
-        meshIndx: index of a node in the defined mesh (int)
-        """
-        
-        Nx=self.NdomX() ; Ny =self.NdomY()
-        k_mesh=meshIndx//(Nx*Ny)
-        layer_indx=meshIndx%(Nx*Ny)
-        j_mesh=(layer_indx)//Nx
-        i_mesh=(layer_indx)%Nx
-        return (i_mesh,j_mesh,k_mesh)
+        #fig.show()
+        if self.__dim == 2:
+            return 0
+        if self.__dim == 3:
+            return 0
 
-    
-    def fixWallVars(self,eq_sol,use_memry=True):
-        """ """
-        ### A change is needed for working with the 'S' tags
-        #### to see how it could work see the extendSol() method
-        dic = self.__neumTagDict.copy()
-        dic.update(self.__dirichTagDict)
-        tags = self.__tags
-        intWallNodes = self.intWallNodes(use_memry)
-        (intWallNodesI,intWallNodesJ,intWallNodesK) = self.meshIndx_ijk(intWallNodes)
-        relevant_tags = [ tags[i] for i in intWallNodes ]
-        relevant_values = [ dic[i] for i in relevant_tags]
         
-        for tag,value,i,j,k in zip(relevant_tags,relevant_values,intWallNodesI,intWallNodesJ,intWallNodesK ):
-            i_vol=i-1 ; j_vol=j-1 ; k_vol=k-1  # i ,j and k are mesh indexes so a -1 should be applied
-            Nx=self.__volumes[0]+2 ; Ny=self.__volumes[1]+2 
-            if tag[0]!='D':
-                n=0
-                flux=dic[tag]
-                neighbour_tag=tag
-                if tag[1]=='e':
-                    while neighbour_tag!='I': 
-                        n-=1
-                        neighbour_tag=tags[ (i+n) + j*Nx + k*Nx*Ny  ]
-                    delta=self.__X[i_vol]-self.__X[i_vol+n]
-                    value=flux*delta + eq_sol[ k_vol , j_vol , i_vol+n ]
-                elif tag[1]=='w':
-                    while neighbour_tag!='I' :
-                        n+=1
-                        neighbour_tag=tags[ (i+n) + j*Nx + k*Nx*Ny  ]
-                    delta=self.__X[i_vol]-self.__X[i_vol+n]
-                    value=flux*delta + eq_sol[ k_vol , j_vol , i_vol+n ]
-                elif tag[1]=='n':
-                    while neighbour_tag!='I':
-                        n-=1
-                        neighbour_tag=tags[ i + (j+n)*Nx + k*Nx*Ny  ]
-                    delta=self.__Y[j_vol]-self.__Y[j_vol+n]
-                    value=flux*delta + eq_sol[ k_vol , j_vol+n , i_vol ]
-                elif tag[1]=='s':
-                    while neighbour_tag!='I':
-                        n+=1
-                        neighbour_tag=tags[ i + (j+n)*Nx + k*Nx*Ny  ]
-                    delta=self.__Y[j_vol]-self.__Y[j_vol+n]
-                    value=flux*delta + eq_sol[ k_vol , j_vol+n , i_vol ]
-                elif tag[1]=='t':
-                    while neighbour_tag!='I':
-                        n-=1
-                        neighbour_tag=tags[ i + j*Nx + (k+n)*Nx*Ny  ]
-                    delta=self.__Z[k_vol]-self.__Z[k_vol+n]
-                    value=flux*delta + eq_sol[ k_vol+n , j_vol , i_vol ]
-                elif tag[1]=='b':
-                    while neighbour_tag!='I':
-                        n+=1
-                        neighbour_tag=tags[ i + j*Nx + (k+n)*Nx*Ny  ]
-                    delta=self.__Z[k_vol]-self.__Z[k_vol+n]
-                    value=flux*delta + eq_sol[ k_vol+n , j_vol , i_vol ]
-                
-            eq_sol[k_vol,j_vol,i_vol]=value
-        
-        return eq_sol
-
-    def extendSol(self,sol_int):
-        """ """
-        Nx=self.__volumes[0]+2 ; Ny=self.__volumes[1]+2 ; Nz=self.__volumes[2]+2
-        T_extend=np.zeros( (Nz,Ny,Nx) )
-        T_extend[1:-1,1:-1,1:-1] = sol_int
-        dic = self.__neumTagDict.copy()
-        dic.update(self.__dirichTagDict)
-        tags = self.__tags
-        extWallNodes = self.extWallNodes()
-        (intWallNodesI,intWallNodesJ,intWallNodesK) = self.meshIndx_ijk(extWallNodes)
-        relevant_tags = [ tags[i] for i in extWallNodes ]
-        relevant_values = [ dic[i] for i in relevant_tags]
-        
-        for tag,value,i,j,k in zip(relevant_tags,relevant_values,intWallNodesI,intWallNodesJ,intWallNodesK ):
-            #
-            if tag[0]=='N':
-                n=0
-                flux=dic[tag]
-                neighbour_tag=tag
-                if tag[1]=='e':
-                    while ((neighbour_tag!='I') & ((i+n)>0)): ##############
-                        n-=1
-                        neighbour_tag=tags[ (i+n) + j*Nx + k*Nx*Ny  ]
-                    delta=self.__dominioX[i]-self.__dominioX[i+n]
-                    value=flux*delta + T_extend[ k , j , i+n ]
-                elif tag[1]=='w':
-                    while ((neighbour_tag!='I') & ((i+n)<Nx)) :
-                        n+=1
-                        neighbour_tag=tags[ (i+n) + j*Nx + k*Nx*Ny  ]
-                    delta=self.__dominioX[i]-self.__dominioX[i+n]
-                    value=flux*delta + T_extend[ k , j , i+n ]
-                elif tag[1]=='n':
-                    while ((neighbour_tag!='I') & ((j+n)>0)):
-                        n-=1
-                        neighbour_tag=tags[ i + (j+n)*Nx + k*Nx*Ny  ]
-                    delta=self.__dominioY[j]-self.__dominioY[j+n]
-                    value=flux*delta + T_extend[ k , j+n , i ]
-                elif tag[1]=='s':
-                    while ((neighbour_tag!='I') & ((j+n)<Ny)):
-                        n+=1
-                        neighbour_tag=tags[ i + (j+n)*Nx + k*Nx*Ny  ]
-                    delta=self.__dominioY[j]-self.__dominioY[j+n]
-                    value=flux*delta + T_extend[ k , j+n , i ]
-                elif tag[1]=='t':
-                    while ((neighbour_tag!='I') & ((k+n)>0)):
-                        n-=1
-                        neighbour_tag=tags[ i + j*Nx + (k+n)*Nx*Ny  ]
-                    delta=self.__dominioZ[k]-self.__dominioZ[k+n]
-                    value=flux*delta + T_extend[ k+n , j , i ]
-                elif tag[1]=='b':
-                    while ((neighbour_tag!='I') & ((k+n)<Nz)):
-                        n+=1
-                        neighbour_tag=tags[ i + j*Nx + (k+n)*Nx*Ny  ]
-                    delta=self.__dominioZ[k]-self.__dominioZ[k+n]
-                    value=flux*delta + T_extend[ k+n , j , i ]
-            elif tag[0]=='S':
-                value = T_extend[k,j,i]
-                
-            T_extend[k,j,i]=value
-        
-        return T_extend
-
-    def intWallNodes(self,use_memry=True):
-        """ """
-        nvx = self.__volumes[0] ; nvy = self.__volumes[1] ; nvz = self.__volumes[2]
-        Nx=nvx+2 ; Ny=nvy+2 ; Nz=nvz+2 
-        if use_memry:
-            if self.__pressed==False:
-                volsEqSys=[i+j*Nx+k*Nx*Ny for k,j,i in product(range(1,Nz-1),range(1,Ny-1), range(1,Nx-1)  ) ]
-                tags=self.__tags
-                tags_serie=pd.Series(tags)
-                bool_cond=tags_serie.str.contains('D|N', regex=True) #serie de pandas booleana que tiene True para los indices con I o S
-                wall_mesh_indx=tags_serie[bool_cond].index     
-                conjunto1=set(volsEqSys)
-                conjunto2=set(wall_mesh_indx)
-                interseccion=conjunto1.intersection(conjunto2) #set
-                intWallNodes=np.array( [element for element in interseccion] ) #array
-                self.__intWallNodes = intWallNodes
-            else:
-                intWallNodes=self.__intWallNodes
-            
-        else:
-            volsEqSys=[i+j*Nx+k*Nx*Ny for k,j,i in product(range(1,Nz-1),range(1,Ny-1), range(1,Nx-1)  ) ]
-            tags=self.__tags
-            tags_serie=pd.Series(tags)
-            bool_cond=tags_serie.str.contains('D|N', regex=True) #serie de pandas booleana que tiene True para los indices con I o S
-            wall_mesh_indx=tags_serie[bool_cond].index     
-            conjunto1=set(volsEqSys)
-            conjunto2=set(wall_mesh_indx)
-            interseccion=conjunto1.intersection(conjunto2) #set
-            intWallNodes=np.array( [element for element in interseccion] ) #array
-   
-        return intWallNodes
-
-    def extWallNodes(self):
-        """Get all indexes of the nodes that corresponds to the exterior walls,
-        that is, the nodes of the W, E, N, S, N, T and B walls, according to
-        the number of dimensions in the mesh"""
-        nvx = self.__volumes[0] ; nvy = self.__volumes[1] ; nvz = self.__volumes[2]
-        Nx=nvx+2 ; Ny=nvy+2 ; Nz=nvz+2 
-        indxs2 = [] ; indxs3=[]
-        if self.__dim ==1:
-            indxs1= [Nx*(Ny+1), Nx*(Ny+2)-1]
-        elif self.__dim==2:
-            indxs1 = [i+j*Nx+ 1*Nx*Ny for j,i in product(range(1,Ny-1), [0,Nx-1] ) ]
-            indxs2 = [i+j*Nx+ 1*Nx*Ny for j,i in product([0,Ny-1], range(0,Nx) ) ]
-        elif self.__dim==3:
-            indxs1 = [i+j*Nx+ k*Nx*Ny for k,j,i in product( [0,Nz-1],range(0,Ny), range(0,Nx) ) ]
-            indxs2 = [i+j*Nx+ k*Nx*Ny for k,j,i in product(range(1,Nz-1),[0,Ny-1], range(0,Nx)  ) ]
-            indxs3 = [i+j*Nx+k*Nx*Ny for k,j,i in product(range(1,Nz-1),range(1,Ny-1), [0,Nx-1]  ) ]
-        indxs=np.array(indxs1+indxs2+indxs3)
-        extWallNodes = np.sort(indxs)
-        
-        return extWallNodes
-        
-        
-    def press(self):
-        """This method states that the mesh won't require any changes and therefore
-        some attributes will be saved in it's final value."""
-        self.__pressed=True
-    
-    def uStagDef(self):
-        """Gives the parameters needed for defining a staggered mesh via the 'setDominio()'
-        method. The staggering it's made in the X axis. """
-        stgX=np.zeros(self.__volumes[0]+1)
-        stgX[-1]=self.__lengths[0]
-        stgX[1:-1]=0.5*(self.X()[:-1]+self.X()[1:])
-        return (stgX,self.dominioY(),self.dominioZ())
-    
-    def vStagDef(self):
-        """Gives the parameters needed for defining a staggered mesh via the 'setDominio()'
-        method. The staggering it's made in the Y axis. """
-        
-        stgY=np.zeros(self.__volumes[1]+1)
-        stgY[-1]=self.__lengths[1]
-        stgY[1:-1]=0.5*(self.Y()[:-1]+self.Y()[1:])
-        return (self.dominioX(),stgY,self.dominioZ())
-    
-    def wStagDef(self):
-        """Gives the parameters needed for defining a staggered mesh via the 'setDominio()'
-        method. The staggering it's made in the Z axis. """
-        
-        stgZ=np.zeros(self.__volumes[2]+1)
-        stgZ[-1]=self.__lengths[2]
-        stgZ[1:-1]=0.5*(self.Z()[:-1]+self.Z()[1:])
-        return (self.dominioX(),self.dominioY(),stgZ)
-    
-    def draw(self,marcador=None,brd_mrkr='s',new_fig=True, s_int=15, s_wall=50):
-        """ Makes a plot of the mesh, that is, a plot which shows all the nodes positions.
-        The dirichet, neumann, source and interior ones are represented with yellow, 
-        blue, magenta and black; accordingly. In the 3D meshes this method is useful
-        with meshes that have just a few nodes, for 3D meshes with many nodes the
-        'drawByCut' method is preferred
-        
-        marcador: Marker for the non-border nodes (string)
-        brd_mrkr: Marker for the border nodes (string)
-        new_fig: Flag to decide if a new figure should be used (True/False)
-        """
-        
-        (X,Y,Z,tags)=self.coordTags()
-        Nx=self.NdomX() ; Ny=self.NdomY()
-        if self.__dim ==1:
-            node_1st = Nx*Ny+Nx #first node that is used for that dimension
-            (X,tags)=(X[node_1st:node_1st+Nx],tags[node_1st:node_1st+Nx])
-            data = {'X':X,'Tag':tags}
-        elif self.__dim==2:
-            node_1st = Nx*Ny #first node that is used for that dimension
-            (X,Y,tags)=(X[node_1st:node_1st+Nx*Ny],Y[node_1st:node_1st+Nx*Ny],tags[node_1st:node_1st+Nx*Ny])
-            data = {'X':X,'Y':Y,'Tag':tags}
-        elif self.__dim ==3:
-            data = {'X':X,'Y':Y,'Z':Z,'Tag':tags}
-        #-------Busquedas y clasificación-------------------------
-        df = pd.DataFrame(data)
-        bool_cond=df['Tag'].str.contains('I', regex=False)  #crea una serie de pandas booleana (a partir de la serie 'Tag') que es true en aquellos indices que contienen I
-        inter_coordTags=np.transpose(df[bool_cond].values) #nos quedamos con un arreglo que tiene las coordenadas y tags de todos los puntos interiores
-        bool_cond=df['Tag'].str.contains('D', regex=False)
-        dirich_coordTags=np.transpose(df[bool_cond].values)
-        bool_cond=df['Tag'].str.contains('N', regex=False)
-        neum_coordTags=np.transpose(df[bool_cond].values)
-        bool_cond=df['Tag'].str.contains('S', regex=False)
-        source_coordTags=np.transpose(df[bool_cond].values)
-        #------------Graficación----------------------------------
-        if self.__dim ==1:
-            if new_fig: plt.figure()
-            plt.title("Grid")
-            plt.xlim(0,self.__lengths[0])
-            plt.scatter(dirich_coordTags[0],0*dirich_coordTags[0],color='y',marker=brd_mrkr,s=s_wall)
-            plt.scatter(neum_coordTags[0],0*neum_coordTags[0],color='b',marker=brd_mrkr,s=s_wall)
-            plt.scatter(source_coordTags[0],0*source_coordTags[0],marker=marcador,color='m',s=s_int)
-            plt.scatter(inter_coordTags[0],0*inter_coordTags[0],marker=marcador,color='k',s=s_int)                
-        elif self.__dim ==2:
-            if new_fig: plt.figure()
-            plt.title("Grid")
-            plt.xlim(0,self.__lengths[0])
-            plt.ylim(0,self.__lengths[1])
-            plt.scatter(neum_coordTags[0],neum_coordTags[1],color='b',marker=brd_mrkr,s=s_wall)
-            plt.scatter(dirich_coordTags[0],dirich_coordTags[1],color='y',marker=brd_mrkr,s=s_wall)
-            plt.scatter(source_coordTags[0],source_coordTags[1],marker=marcador,color='m',s=s_int)
-            plt.scatter(inter_coordTags[0],inter_coordTags[1],marker=marcador,color='k',s=s_int)
-
-        elif self.__dim ==3:
-            fig = plt.figure()
-            ax = fig.add_subplot(111, projection='3d')
-            ax.scatter(dirich_coordTags[0], dirich_coordTags[1], dirich_coordTags[2], marker=brd_mrkr, color='y')
-            ax.scatter(neum_coordTags[0],neum_coordTags[1] ,neum_coordTags[2] , marker=brd_mrkr,color='b')
-            ax.scatter(source_coordTags[0],source_coordTags[1] , source_coordTags[2], marker=marcador,color='m',s=s_int)
-            ax.scatter(inter_coordTags[0],inter_coordTags[1] , inter_coordTags[2], marker=marcador,color='k',s=s_int)
-        plt.show()
-
-
     def drawByCut(self,x_cut=None,y_cut=None,z_cut=None):
         """ Makes three 2D plots of a 3D mesh, that is, three plots which shows the nodes
         positions corresponding to a transversal cutting plane. The three plots can be
@@ -988,6 +398,35 @@ class Mesh():
         plt.scatter(source_coordTags[0],source_coordTags[1],color='m',s=15)
         plt.scatter(inter_coordTags[0],inter_coordTags[1],color='k',s=15)
         plt.show()
+    
+    
+    def uStagDef(self):
+        """Gives the parameters needed for defining a staggered mesh via the 'setDominio()'
+        method. The staggering it's made in the X axis. """
+        stgX = np.zeros(self.__volumes[0]+1)
+        stgX[-1] = self.__lengths[0]
+        stgX[1:-1] = 0.5*(self.X()[:-1] + self.X()[1:])
+        return (stgX,self.dominioY(),self.dominioZ())
+    
+    
+    def vStagDef(self):
+        """Gives the parameters needed for defining a staggered mesh via the 'setDominio()'
+        method. The staggering it's made in the Y axis. """
+        
+        stgY=np.zeros(self.__volumes[1]+1)
+        stgY[-1]=self.__lengths[1]
+        stgY[1:-1]=0.5*(self.Y()[:-1]+self.Y()[1:])
+        return (self.dominioX(),stgY,self.dominioZ())
+    
+    
+    def wStagDef(self):
+        """Gives the parameters needed for defining a staggered mesh via the 'setDominio()'
+        method. The staggering it's made in the Z axis. """
+        
+        stgZ=np.zeros(self.__volumes[2]+1)
+        stgZ[-1]=self.__lengths[2]
+        stgZ[1:-1]=0.5*(self.Z()[:-1]+self.Z()[1:])
+        return (self.dominioX(),self.dominioY(),stgZ)
 
 
     def vols(self):
@@ -1045,186 +484,3 @@ class Mesh():
         if dim >1: dy_vol[-1] += 0.5*dy[-1] ; dy_vol[0] += 0.5*dy[0]
         areas_grid =np.meshgrid(dy_vol,np.ones(nvz),dx_vol )
         return areas_grid[2]*areas_grid[0]
-
-    def dxe(self):
-        """" Returns a 3-dimensional numpy array containing the separations between 
-        the corresponding node and it's east neighbor. The numpy array contains 
-        a separation (distance) for each volume. """  
-        
-        dx=self.deltaX()
-        nvy=self.__volumes[1] ; nvz=self.__volumes[2]
-        dxe = dx[1:]
-        dxe_grid = np.meshgrid(np.ones(nvy),np.ones(nvz),dxe)
-        return dxe_grid[2]
-
-    def dxw(self):
-        """" Returns a 3-dimensional numpy array containing the separations between 
-        the corresponding node and it's west neighbor. The numpy array contains 
-        a separation (distance) for each volume. """    
-        
-        dx=self.deltaX()
-        nvy=self.__volumes[1] ; nvz=self.__volumes[2]
-        dxw = dx[:-1]
-        dxw_grid = np.meshgrid(np.ones(nvy),np.ones(nvz),dxw)
-        return dxw_grid[2]  
-
-    def dyn(self):
-        """" Returns a 3-dimensional numpy array containing the separations between 
-        the corresponding node and it's north neighbor. The numpy array contains 
-        a separation (distance) for each volume. """     
-        
-        dy=self.deltaY()
-        nvx=self.__volumes[0] ; nvz=self.__volumes[2]
-        dyn = dy[1:]
-        dyn_grid = np.meshgrid(dyn,np.ones(nvz),np.ones(nvx))
-        return dyn_grid[0] 
-
-    def dys(self):
-        """" Returns a 3-dimensional numpy array containing the separations between 
-        the corresponding node and it's south neighbor. The numpy array contains 
-        a separation (distance) for each volume. """     
-        
-        dy=self.deltaY()
-        nvx=self.__volumes[0] ; nvz=self.__volumes[2]
-        dys = dy[:-1]
-        dys_grid = np.meshgrid(dys,np.ones(nvz),np.ones(nvx))
-        return dys_grid[0]
-
-    def dzt(self):
-        """" Returns a 3-dimensional numpy array containing the separations between 
-        the corresponding node and it's top (upper) neighbor. The numpy array contains 
-        a separation (distance) for each volume. """     
-        
-        dz=self.deltaZ()
-        nvx=self.__volumes[0] ; nvy=self.__volumes[1]
-        dzt = dz[1:]
-        dzt_grid = np.meshgrid(np.ones(nvy),dzt,np.ones(nvx))
-        return dzt_grid[1]
-
-    def dzb(self):
-        """" Returns a 3-dimensional numpy array containing the separations between 
-        the corresponding node and it's bottom (lower) neighbor. The numpy array contains 
-        a separation (distance) for each volume. """     
-        
-        dz=self.deltaZ()
-        nvx=self.__volumes[0] ; nvy=self.__volumes[1]
-        dzb = dz[:-1]
-        dzb_grid = np.meshgrid(np.ones(nvy),dzb,np.ones(nvx))
-        return dzb_grid[1]
-
-    
-    def xe(self,x=None,dxe=None):
-        #Gives a 3-dimensional array containing the x coordinate of the east border in the volume.
-        #The numpy array has a x coordinate (position) for every volume."""
-        return x+0.5*dxe
-
-    def xw(self,x=None,dxw=None):
-        #Gives a 3-dimensional array containing the x coordinate of the west border in the volume.
-        #The numpy array has a x coordinate (position) for every volume."""
-        return x-0.5*dxw
-    
-    def yn(self,y=None,dyn=None):
-        #Gives a 3-dimensional array containing the y coordinate of the north border in the volume.
-        #The numpy array has a y coordinate (position) for every volume.
-        return y+0.5*dyn
-
-    def ys(self,y=None,dys=None):
-        #Gives a 3-dimensional array containing the y coordinate of the south border in the volume.
-        #The numpy array has a y coordinate (position) for every volume.
-        return y-0.5*dys    
-
-    def zt(self,z=None,dzt=None):
-        #Gives a 3-dimensional array containing the z coordinate of the top border in the volume.
-        #The numpy array has a z coordinate (position) for every volume.
-        return z+0.5*dzt
-
-    def zb(self,z=None,dzb=None):
-        #Gives a 3-dimensional array containing the z coordinate of the bottom border in the volume.
-        #The numpy array has a z coordinate (position) for every volume.
-        return z-0.5*dzb        
-
-    def nvx(self):
-        return self.__volumes[0]
-
-    def nvy(self):
-        return self.__volumes[1]
-
-    def nvz(self):
-        return self.__volumes[2]
-    
-    def nvzyx(self):
-        return (self.__volumes[2] , self.__volumes[1] , self.__volumes[0])
-
-    def lx(self):
-        return self.__lengths[0]
-
-    def ly(self):
-        return self.__lengths[1]
-
-    def lz(self):
-        return self.__lengths[2]
-    
-    def X(self):
-        return self.__X
-
-    def Y(self):
-        return self.__Y
-
-    def Z(self):
-        return self.__Z
-
-    def dominioX(self):
-        return self.__dominioX
-
-    def dominioY(self):
-        return self.__dominioY
-
-    def dominioZ(self):
-        return self.__dominioZ
-
-    def deltaX(self):
-        return np.array(self.__deltaX)
-
-    def deltaY(self):
-        return np.array(self.__deltaY)
-
-    def deltaZ(self):
-        return np.array(self.__deltaZ)
-    
-    def dim(self):
-        return self.__dim
-
-    def coordGrid(self):
-        coordGrid=np.meshgrid(self.Y(),self.Z(),self.X())
-        return (coordGrid[2],coordGrid[0],coordGrid[1])
-    
-    def coordX(self):
-        return self.__coordX
-
-    def coordY(self):
-        return self.__coordY
-
-    def coordZ(self):
-        return self.__coordZ
-    
-    def tags(self):
-        return self.__tags
-    
-    def tagShaped(self):
-        """Get the tags and their respective nodes coordinates in a printable fashion"""
-        nvx=self.__volumes[0] ; nvy=self.__volumes[1] ; nvz=self.__volumes[2] 
-        tags_shaped= np.reshape(self.__tags,(nvz,nvy,nvx)) #nvx+2
-        return tags_shaped
-    
-    def dirichValues(self):
-        return self.__dirichTagDict
-
-    def neumValues(self):
-        return self.__neumTagDict
-
-    def sourcValues(self):
-        return self.__sourcTagDict    
-    
-    
-
-    
