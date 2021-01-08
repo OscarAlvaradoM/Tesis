@@ -220,14 +220,14 @@ class Mesh():
             for key in self.__tags_fronteras.keys():
                 if list(self.__tags_fronteras[key]["frontera"].keys())[0] == direction:
                     if self.__tags_fronteras[key]["frontera"][direction] == "ON":
-                        self.__tags_fronteras[key]["frontera"][direction] = {tag: value}
+                        self.__tags_fronteras[key]["cond"] = {tag: value}
                     
         if coords:
             for idx, key in enumerate(coords):
                 if key in list(self.__tags.keys()):
                     self.__tags[key][direction[idx]][tag[idx]] = value[idx]
                 elif key in list(self.__tags_fronteras.keys()):
-                    self.__tags_fronteras[key]["frontera"][direction[idx]] = {tag[idx]: value[idx]}
+                    self.__tags_fronteras[key]["cond"] = {tag[idx]: value[idx]}
                 
     
     
@@ -272,20 +272,24 @@ class Mesh():
             
             
     def draw(self):
-        dic_colors = {"D": "gold", "N": "blue", "S": "magenta"}
-        lim_izquierdo = [list(self.__tags[key]["E"].keys())[0] for key in self.__tags if isinstance(self.__tags[key]["E"], dict)]
-        lim_derecho = [list(self.__tags[key]["W"].keys())[0] for key in self.__tags if isinstance(self.__tags[key]["W"], dict)]
-        colores =  [dic_colors[lim] for lim in lim_izquierdo] + ["black" for _ in self.__coords[0]] + [dic_colors[lim] for lim in limite_derecho]
-        marcadores = ["square"] + [0 for _ in self.__coords[0]] + ["square"]
-        #fig = go.Figure(data = go.Scatter(x = self.__dominios[0], y = np.zeros(len(self.__dominios[0])), 
-        #                                      mode = 'markers', marker = dict(color = colores, symbol = marcadores, size = 10)))
-
-        #fig.show()
-        if self.__dim == 2:
-            return 0
-        if self.__dim == 3:
-            return 0
-
+        # Primero graficamos las fronteras, sean o no activas
+        dic_colors = {"D": "gold", "N": "red", "S": "magenta", "Off": "gray"}
+        condiciones = [list(self.__tags_fronteras[key]["cond"].keys())[0] if list(self.__tags_fronteras[key]["frontera"].values())[0] == "ON" else "Off" for key in list(self.__tags_fronteras.keys())]
+        colores = [dic_colors[cond] for cond in condiciones]
+        coordenadasX = [self.__tags_fronteras[key]["coord"][0] for key in list(self.__tags_fronteras.keys())]
+        coordenadasY = [self.__tags_fronteras[key]["coord"][1] for key in list(self.__tags_fronteras.keys())]
+        coordenadasZ = [self.__tags_fronteras[key]["coord"][2] for key in list(self.__tags_fronteras.keys())]
+        fig = go.Figure(data = go.Scatter3d(x = coordenadasX, y = coordenadasY, z = coordenadasZ,
+                                              mode = 'markers', marker = dict(color = colores, symbol = "square", size = 2)))
+        
+        # Ahora grafiquemos los volúmenes
+        coordX = [self.__tags[key]["coord"][0] for key in list(self.__tags.keys())]
+        coordY = [self.__tags[key]["coord"][1] for key in list(self.__tags.keys())]
+        coordZ = [self.__tags[key]["coord"][2] for key in list(self.__tags.keys())]
+        fig.add_trace(go.Scatter3d(x = coordX, y = coordY, z = coordZ,
+                                              mode = 'markers', marker = dict(color = "blue", size = 5)))
+        fig.show()
+        
         
     def drawByCut(self,x_cut=None,y_cut=None,z_cut=None):
         """ Makes three 2D plots of a 3D mesh, that is, three plots which shows the nodes
