@@ -154,6 +154,10 @@ class Mesh():
     #    return d_3
     
     def init_tags_fronteras(self):
+        """
+        Método para etiquetar las fronteras dependiendo de la dimensión, sólo se les da la propiedad de existir o no
+        existir.
+        """
         X, Y, Z = [len(dom) for dom in self.__dominios]
         for z in range(Z):
             for y in range(Y):
@@ -177,18 +181,20 @@ class Mesh():
                                 else: continue
                             else: continue
                             self.__tags_fronteras[f"{x}{y}{z}"] = {"frontera": {var: value},
-                                                 "coord": [self.__dominios[0][x], self.__dominios[1][y], self.__dominios[2][z]]} 
+                                                 "coord": [self.__dominios[0][x], self.__dominios[1][y], self.__dominios[2][z]],
+                                                                  "cond": {}} 
                         elif z != 0 and z != (Z - 1):
                             if x != 0 and x != (X - 1):
                                 if y == 0: var = "S"; value = s
                                 elif y == (Y - 1) : var = "N"; value = n
                                 self.__tags_fronteras[f"{x}{y}{z}"] = {"frontera": {var: value},
-                                                 "coord": [self.__dominios[0][x], self.__dominios[1][y], self.__dominios[2][z]]} 
+                                                 "coord": [self.__dominios[0][x], self.__dominios[1][y], self.__dominios[2][z]],
+                                                                      "cond": {}} 
                         else: continue
     
     def init_tags(self):
         """
-        Clase que etiqueta las caras adyacentes de cada volumen dependiendo de la geometría. Pone un 0 (cero) cuando es una 
+        Método que etiqueta las caras adyacentes de cada volumen dependiendo de la geometría. Pone un 0 (cero) cuando es una 
         frontera, una 'F' cuando es una cara interna y un 'Off' cuando no se está contando esa cara por las dimensiones del 
         problema. 
         """
@@ -212,26 +218,73 @@ class Mesh():
                     self.__tags[f"{x}{y}{z}"] = {"E": e, "W": w, "N": n, "S": s, "T": t, "B": b, 
                                              "coord": [self.__dominios[0][x], self.__dominios[1][y], self.__dominios[2][z]]}
             
-    def tagWall(self, direction, tag, value, coords=None):
-        if isinstance(direction, str):
-            for key in self.__tags.keys():
-                if isinstance(self.__tags[key][direction], dict):
-                    self.__tags[key][direction][tag] = value
-            for key in self.__tags_fronteras.keys():
-                if list(self.__tags_fronteras[key]["frontera"].keys())[0] == direction:
-                    if self.__tags_fronteras[key]["frontera"][direction] == "ON":
-                        self.__tags_fronteras[key]["cond"] = {tag: value}
-                    
+    def tag_wall(self, direction, tag, value):
+        """
+        Método para etiquetar fronteras dada la dirección, el tipo de condición de frontera y el valor.
+        """
+        for key in self.__tags.keys():
+            if isinstance(self.__tags[key][direction], dict):
+                self.__tags[key][direction][tag] = value
+        for key in self.__tags_fronteras.keys():
+            if self.__tags_fronteras[key]["frontera"].get(direction) == "ON":
+                self.__tags_fronteras[key]["cond"][tag] = value
+
+    def tag_wall_dirichlet(self, direction, value, coords=None):
+        """
+        Método para etiquetar fronteras con condición de Dirichlet dados ciertos valores.
+        """
         if coords:
             for idx, key in enumerate(coords):
                 if key in list(self.__tags.keys()):
-                    self.__tags[key][direction[idx]][tag[idx]] = value[idx]
+                    self.__tags[key][direction[idx]]["D"] = value[idx]
                 elif key in list(self.__tags_fronteras.keys()):
-                    self.__tags_fronteras[key]["cond"] = {tag[idx]: value[idx]}
+                    self.__tags_fronteras[key]["cond"]["D"] =  value[idx]
+        else:
+            if isinstance(direction, list):
+                for idx, direct in enumerate(direction):
+                    self.tag_wall(direct, "D", value[idx])
+            else:
+                self.tag_wall(direction, "D", value)
+                    
+    def tag_wall_neumann(self, direction, value, coords=None):
+        """
+        Método para etiquetar fronteras con condición de Neumann dados ciertos valores.
+        """
+        if coords:
+            for idx, key in enumerate(coords):
+                if key in list(self.__tags.keys()):
+                    self.__tags[key][direction[idx]]["N"] = value[idx]
+                elif key in list(self.__tags_fronteras.keys()):
+                    self.__tags_fronteras[key]["cond"]["N"] = value[idx]
+        else:
+            if isinstance(direction, list):
+                for idx, direct in enumerate(direction):
+                    self.tag_wall(direct, "N", value[idx])
+            else:
+                self.tag_wall(direction, "N", value)
+                    
+    def tag_wall_source(self, direction, value, coords=None):
+        """
+        Método para etiquetar fronteras con condición de Neumann dados ciertos valores.
+        """
+        if coords:
+            for idx, key in enumerate(coords):
+                if key in list(self.__tags.keys()):
+                    self.__tags[key][direction[idx]]["S"] = value[idx]
+                elif key in list(self.__tags_fronteras.keys()):
+                    self.__tags_fronteras[key]["cond"]["S"] = value[idx]
+        else:
+            if isinstance(direction, list):
+                for idx, direct in enumerate(direction):
+                    self.tag_wall(direct, "S", value[idx])
+            else:
+                self.tag_wall(direction, "S", value)
                 
     
-    
-    def setDominio(self, dominio, faces=None):
+    def set_dominio(self, dominio, faces=None):
+        """
+        Método para definir el dominio de estudio dadas unas coordenadas en forma de tupla.
+        """
         
         self.__autoMesh = False # La posición de los nodos no se calcula en automático
         
@@ -255,7 +308,9 @@ class Mesh():
     
     
     def info(self):
-        #-----Prints relevant information about the mesh------
+        """
+        Método para imprimir información relevante del mallado
+        """
         print('=====================================')
         print('     MESH INFORMATION   ')
         print('=====================================')
@@ -272,150 +327,43 @@ class Mesh():
             
             
     def draw(self):
-        # Primero graficamos las fronteras, sean o no activas
+        """
+        Método para graficar la malla. Este método se invoca hasta que se hayan inizializado todas las condiciones
+        de frontera.
+        """
+        # Graficamos las fronteras, sean o no activas
         dic_colors = {"D": "gold", "N": "red", "S": "magenta", "Off": "gray"}
         condiciones = [list(self.__tags_fronteras[key]["cond"].keys())[0] if list(self.__tags_fronteras[key]["frontera"].values())[0] == "ON" else "Off" for key in list(self.__tags_fronteras.keys())]
         colores = [dic_colors[cond] for cond in condiciones]
-        coordenadasX = [self.__tags_fronteras[key]["coord"][0] for key in list(self.__tags_fronteras.keys())]
-        coordenadasY = [self.__tags_fronteras[key]["coord"][1] for key in list(self.__tags_fronteras.keys())]
-        coordenadasZ = [self.__tags_fronteras[key]["coord"][2] for key in list(self.__tags_fronteras.keys())]
-        fig = go.Figure(data = go.Scatter3d(x = coordenadasX, y = coordenadasY, z = coordenadasZ,
+        # Obtenemos las coordenadas de las fronteras y de los nodos internos.
+        coordenadas = [] # Aquí se pondrán las coordenadas de las fornteras
+        coord = [] # Aquí las coordendas de los nodos internos
+        for i in range(3):
+            coordenadas.append([self.__tags_fronteras[key]["coord"][i] for key in list(self.__tags_fronteras.keys())])
+            coord.append([self.__tags[key]["coord"][i] for key in list(self.__tags.keys())])
+        fig = go.Figure(data = go.Scatter3d(x = coordenadas[0], y = coordenadas[1], z = coordenadas[2],
                                               mode = 'markers', marker = dict(color = colores, symbol = "square", size = 2)))
-        
-        # Ahora grafiquemos los volúmenes
-        coordX = [self.__tags[key]["coord"][0] for key in list(self.__tags.keys())]
-        coordY = [self.__tags[key]["coord"][1] for key in list(self.__tags.keys())]
-        coordZ = [self.__tags[key]["coord"][2] for key in list(self.__tags.keys())]
-        fig.add_trace(go.Scatter3d(x = coordX, y = coordY, z = coordZ,
+        fig.add_trace(go.Scatter3d(x = coord[0], y = coord[1], z = coord[2],
                                               mode = 'markers', marker = dict(color = "blue", size = 5)))
         fig.show()
-        
-        
-    def drawByCut(self,x_cut=None,y_cut=None,z_cut=None):
-        """ Makes three 2D plots of a 3D mesh, that is, three plots which shows the nodes
-        positions corresponding to a transversal cutting plane. The three plots can be
-        interpreted as some frontal, side and upper view.
-        The x, y and z numbers that determine the location of the frontal, side and upper
-        cutting plane are given by 'x_cut', 'y_cut' and 'z_cut' parameters, accordingly.
-        The dirichet, neumann, source and interior ones are represented with yellow, 
-        blue, magenta and black. 
-        
-        x_cut: x constant coordinate of the frontal cutting plane (float)
-        y_cut: y constant coordinate of the side cutting plane (float)
-        z_cut: z constant coordinate of the upper cutting plane (float)
-        
+    
+    
+    def u_stag_def(self):
         """
-
-        Nx= self.NdomX() ; Ny = self.NdomY()  ; Nz = self.NdomZ()
-        tags=self.tags() # Extraemmos los tags del dominio
-        tags = np.reshape(tags,(Nz,Ny,Nx))
-        lx = self.lx() ; ly = self.ly() ; lz = self.lz() #extraemos medidas del dominio
-        domX = self.dominioX() ; domY = self.dominioY() ; domZ = self.dominioZ()
-        coordY,coordZ,coordX = np.meshgrid(domY,domZ,domX)
-        if x_cut==None: x_cut=lx/2.
-        if y_cut==None: y_cut=ly/2.
-        if z_cut==None: z_cut=lz/2.
-        indx_xcut=np.argmax(x_cut<domX)
-        indx_ycut=np.argmax(y_cut<domY)
-        indx_zcut=np.argmax(z_cut<domZ)
-        if (x_cut-domX[indx_xcut-1]) < (domX[indx_xcut] - x_cut): 
-            indx_xcut-=1  #Si está mas cerca de X[índice anterior] tomamos el índice anterior
-        if (y_cut-domY[indx_ycut-1]) < (domY[indx_ycut] - y_cut): 
-            indx_ycut-=1
-        if (z_cut-domZ[indx_zcut-1]) < (domZ[indx_zcut] - z_cut): 
-            indx_zcut-=1
-        #========================================================
-        # GRAFICAMOS EL CORTE Y
-        #========================================================
-        X=coordX[:,indx_ycut,:] ; Y=coordY[:,indx_ycut,:] ; Z=coordZ[:,indx_ycut,:] 
-        tagsCut = tags[:,indx_ycut,:]
-        data = {'X':X.flatten(),'Y':Y.flatten(),'Z':Z.flatten(),'Tag':tagsCut.flatten()}
-        #-------Busquedas y clasificación-------------------------
-        df = pd.DataFrame(data)
-        bool_cond=df['Tag'].str.contains('I', regex=False)  #crea una serie de pandas booleana (a partir de la serie 'Tag') que es true en aquellos indices que contienen I
-        inter_coordTags=np.transpose(df[bool_cond].values) #nos quedamos con un arreglo que tiene las coordenadas y tags de todos los puntos interiores
-        bool_cond=df['Tag'].str.contains('D', regex=False)
-        dirich_coordTags=np.transpose(df[bool_cond].values)
-        bool_cond=df['Tag'].str.contains('N', regex=False)
-        neum_coordTags=np.transpose(df[bool_cond].values)
-        bool_cond=df['Tag'].str.contains('S', regex=False)
-        source_coordTags=np.transpose(df[bool_cond].values)
-        #------------Graficación----------------------------------              
-        plt.figure()
-        plt.title("GridXZ   y={}".format(domY[indx_ycut]))
-        plt.xlim(0,self.__lengths[0])
-        plt.ylim(0,self.__lengths[2])
-        plt.scatter(dirich_coordTags[0],dirich_coordTags[2],color='y',marker='s',s=50)
-        plt.scatter(neum_coordTags[0],neum_coordTags[2],color='b',marker='s',s=50)
-        plt.scatter(source_coordTags[0],source_coordTags[2],color='m',s=15)
-        plt.scatter(inter_coordTags[0],inter_coordTags[2],color='k',s=15)
-        plt.show()
-        #========================================================
-        # GRAFICAMOS EL CORTE X
-        #========================================================
-        X=coordX[:,:,indx_xcut] ; Y=coordY[:,:,indx_xcut] ;Z=coordZ[:,:,indx_xcut]
-        tagsCut = tags[:,:,indx_xcut]
-        data = {'X':X.flatten(),'Y':Y.flatten(),'Z':Z.flatten(),'Tag':tagsCut.flatten()}
-        #-------Busquedas y clasificación-------------------------
-        df = pd.DataFrame(data)
-        bool_cond=df['Tag'].str.contains('I', regex=False)  #crea una serie de pandas booleana (a partir de la serie 'Tag') que es true en aquellos indices que contienen I
-        inter_coordTags=np.transpose(df[bool_cond].values) #nos quedamos con un arreglo que tiene las coordenadas y tags de todos los puntos interiores
-        bool_cond=df['Tag'].str.contains('D', regex=False)
-        dirich_coordTags=np.transpose(df[bool_cond].values)
-        bool_cond=df['Tag'].str.contains('N', regex=False)
-        neum_coordTags=np.transpose(df[bool_cond].values)
-        bool_cond=df['Tag'].str.contains('S', regex=False)
-        source_coordTags=np.transpose(df[bool_cond].values)
-        #------------Graficación----------------------------------              
-        plt.figure()
-        plt.title("GridYZ   x={}".format(domX[indx_xcut]))
-        plt.xlim(0,self.__lengths[1])
-        plt.ylim(0,self.__lengths[2])
-        plt.scatter(dirich_coordTags[1],dirich_coordTags[2],color='y',marker='s',s=50)
-        plt.scatter(neum_coordTags[1],neum_coordTags[2],color='b',marker='s',s=50)
-        plt.scatter(source_coordTags[1],source_coordTags[2],color='m',s=15)
-        plt.scatter(inter_coordTags[1],inter_coordTags[2],color='k',s=15)
-        plt.show()
-        #========================================================
-        # GRAFICAMOS EL CORTE Z
-        #========================================================
-        X=coordX[indx_zcut,:,:] ; Y=coordY[indx_zcut,:,:] ;Z=coordZ[indx_zcut,:,:]
-        tagsCut = tags[indx_zcut,:,:]
-        data = {'X':X.flatten(),'Y':Y.flatten(),'Z':Z.flatten(),'Tag':tagsCut.flatten()}
-        #-------Busquedas y clasificación-------------------------
-        df = pd.DataFrame(data)
-        bool_cond=df['Tag'].str.contains('I', regex=False)  #crea una serie de pandas booleana (a partir de la serie 'Tag') que es true en aquellos indices que contienen I
-        inter_coordTags=np.transpose(df[bool_cond].values) #nos quedamos con un arreglo que tiene las coordenadas y tags de todos los puntos interiores
-        bool_cond=df['Tag'].str.contains('D', regex=False)
-        dirich_coordTags=np.transpose(df[bool_cond].values)
-        bool_cond=df['Tag'].str.contains('N', regex=False)
-        neum_coordTags=np.transpose(df[bool_cond].values)
-        bool_cond=df['Tag'].str.contains('S', regex=False)
-        source_coordTags=np.transpose(df[bool_cond].values)
-        #------------Graficación----------------------------------              
-        plt.figure()
-        plt.title("GridXY z={}".format(domZ[indx_zcut]))
-        plt.xlim(0,self.__lengths[0])
-        plt.ylim(0,self.__lengths[1])
-        plt.scatter(dirich_coordTags[0],dirich_coordTags[1],color='y',marker='s',s=50)
-        plt.scatter(neum_coordTags[0],neum_coordTags[1],color='b',marker='s',s=50)
-        plt.scatter(source_coordTags[0],source_coordTags[1],color='m',s=15)
-        plt.scatter(inter_coordTags[0],inter_coordTags[1],color='k',s=15)
-        plt.show()
-    
-    
-    def uStagDef(self):
-        """Gives the parameters needed for defining a staggered mesh via the 'setDominio()'
-        method. The staggering it's made in the X axis. """
+        Gives the parameters needed for defining a staggered mesh via the 'setDominio()'
+        method. The staggering it's made in the X axis.
+        """
         stgX = np.zeros(self.__volumes[0]+1)
         stgX[-1] = self.__lengths[0]
         stgX[1:-1] = 0.5*(self.X()[:-1] + self.X()[1:])
         return (stgX,self.dominioY(),self.dominioZ())
     
     
-    def vStagDef(self):
-        """Gives the parameters needed for defining a staggered mesh via the 'setDominio()'
-        method. The staggering it's made in the Y axis. """
+    def v_stag_def(self):
+        """
+        Gives the parameters needed for defining a staggered mesh via the 'setDominio()'
+        method. The staggering it's made in the Y axis.
+        """
         
         stgY=np.zeros(self.__volumes[1]+1)
         stgY[-1]=self.__lengths[1]
@@ -423,9 +371,11 @@ class Mesh():
         return (self.dominioX(),stgY,self.dominioZ())
     
     
-    def wStagDef(self):
-        """Gives the parameters needed for defining a staggered mesh via the 'setDominio()'
-        method. The staggering it's made in the Z axis. """
+    def w_stag_def(self):
+        """
+        Gives the parameters needed for defining a staggered mesh via the 'setDominio()'
+        method. The staggering it's made in the Z axis.
+        """
         
         stgZ=np.zeros(self.__volumes[2]+1)
         stgZ[-1]=self.__lengths[2]
@@ -434,8 +384,10 @@ class Mesh():
 
 
     def vols(self):
-        """ Returns a 3-dimensional numpy array containing all the value of the volumes,
-         that is lenght times width times height, for each one."""
+        """
+        Returns a 3-dimensional numpy array containing all the value of the volumes,
+         that is lenght times width times height, for each one.
+         """
         dim = self.__dim
         dx=self.deltaX() ; dy=self.deltaY() ; dz=self.deltaZ()
         dx_vol = (dx[1:]+dx[:-1])/2. 
@@ -445,11 +397,13 @@ class Mesh():
         if dim >1: dy_vol[-1] += 0.5*dy[-1] ; dy_vol[0] += 0.5*dy[0]
         if dim >2: dz_vol[-1] += 0.5*dz[-1] ; dz_vol[0] += 0.5*dz[0]
         vols_dim_grid = np.meshgrid(dy_vol,dz_vol,dx_vol)
-        return vols_dim_grid[2]*vols_dim_grid[0]*vols_dim_grid[1]
+        return vols_dim_grid[0]*vols_dim_grid[1]*vols_dim_grid[2]
     
-    def areasX(self):
-        """" Returns a 3-dimensional numpy array containing the areas of the faces in
-        the X direction. The numpy array contains an area for each volume. """
+    def areas_x(self):
+        """
+        Returns a 3-dimensional numpy array containing the areas of the faces in
+        the X direction. The numpy array contains an area for each volume. 
+        """
         
         dim = self.__dim
         dy=self.deltaY() ; dz=self.deltaZ()
@@ -461,9 +415,11 @@ class Mesh():
         areas_grid =np.meshgrid(dy_vol,dz_vol,np.ones(nvx) )
         return areas_grid[0]*areas_grid[1]
 
-    def areasY(self):
-        """" Returns a 3-dimensional numpy array containing the areas of the faces in
-        the Y direction. The numpy array contains an area for each volume. """        
+    def areas_y(self):
+        """
+        Returns a 3-dimensional numpy array containing the areas of the faces in
+        the Y direction. The numpy array contains an area for each volume. 
+        """
 
         dim = self.__dim
         dx=self.deltaX() ; dz=self.deltaZ()
@@ -475,9 +431,11 @@ class Mesh():
         areas_grid =np.meshgrid(np.ones(nvy),dz_vol, dx_vol)
         return areas_grid[2]*areas_grid[1]
 
-    def areasZ(self):
-        """" Returns a 3-dimensional numpy array containing the areas of the faces in
-        the Z direction. The numpy array contains an area for each volume. """  
+    def areas_z(self):
+        """
+        Returns a 3-dimensional numpy array containing the areas of the faces in
+        the Z direction. The numpy array contains an area for each volume. 
+        """  
         
         dim = self.__dim
         dx=self.deltaX() ; dy=self.deltaY()
