@@ -90,36 +90,36 @@ class Mesh():
         lengths: lenght of domain in each dimension (tuple of ints or int)
         """
 
-        self.__volumes = (1,1,1)
-        self.__lengths = (0.01, 0.01, 0.01)
+        self.volumes = (1,1,1)
+        self.lengths = (0.01, 0.01, 0.01)
 
         #----default values for positions and separations of the grid-------------
-        self.__coords = [(0.005,) for _ in range(3)] # Coordenadas de los centros de los volúmenes
-        self.__dominios = [tuple([0.]+[self.__coords[i][0]]+[self.__lengths[i]]) for i in range(3)]
-        self.__deltas = [(0,) for _ in range(3)]
+        self.coords = [(0.005,) for _ in range(3)] # Coordenadas de los centros de los volúmenes
+        self.dominios = [tuple([0.]+[self.coords[i][0]]+[self.lengths[i]]) for i in range(3)]
+        self.deltas = [(0,) for _ in range(3)]
         # Hasta aquí tenemos un cubito
 
         self.__tags = {} # El etiquetado de todos los nodos sin fronteras
-        self.__tags_fronteras = {} # El etiquetado de las fornteras
+        self.__tags_fronteras = {} # El etiquetado de las fronteras
 
         self.__autoMesh = True      # Al parecer es una bandera para calcular la posición de los nodos atmte
-        self.__emptyCoord = True    # Nos dice si las coordenadas del dominio (self.__coords_dom) están guardadas
+        self.__emptyCoord = True    # Nos dice si las coordenadas del dominio (self.coords_dom) están guardadas
         self.__pressed = False      # No sé
 
         self.__intWallNodes = None  # No sé
         
-        self.__dim = dim
+        self.dim = dim
         #---if a parameter is not a tuple, that parameter is transformed into a tuple
-        if isinstance(volumes, int):  self.__volumes = (volumes, 1, 1)
-        if isinstance(lengths, (int, float)):  self.__lengths = (lengths, lengths/10, lengths/10)
+        if isinstance(volumes, int):  self.volumes = (volumes, 1, 1)
+        if isinstance(lengths, (int, float)):  self.lengths = (lengths, lengths/10, lengths/10)
         
         # Si los parámetros son tuplas (pero no necesariamente sería una tupla de 3, arreglamos eso:
         if isinstance(volumes, tuple):
             faltan = 3 - len(volumes)
-            self.__volumes = volumes + tuple([1 for i in range(faltan)])
+            self.volumes = volumes + tuple([1 for i in range(faltan)])
         if isinstance(lengths, tuple): 
             faltan = 3 - len(lengths)
-            self.__lengths = lengths + tuple([lengths[0]/10 for i in range(faltan)])
+            self.lengths = lengths + tuple([lengths[0]/10 for i in range(faltan)])
         #---------------------------------------------------------------
         
         # if volumes and lengths are given, initialize values acording to dimension
@@ -130,16 +130,16 @@ class Mesh():
     
     
     def uniformGrid(self):
-        l = np.array(self.__lengths) # Para el manejo con numpy
-        v = np.array(self.__volumes)
+        l = np.array(self.lengths) # Para el manejo con numpy
+        v = np.array(self.volumes)
         d = l/v # Separación entre todos los nodos de cada dimensión
         start = d/2 # La frontera "inicial" del arreglo
         stop = l-d/2 # La frontera "final" del arreglo
-        self.__coords = [tuple(np.linspace(strt, stp, vol)) for strt, stp, vol in list(zip(start, stop, v))] # Meshgrid posible
-        dominios = [np.insert(arr,(0,len(arr)),[0, l[idx]]) for idx, arr in enumerate(self.__coords)] # Coordenadas + fronteras
-        self.__deltas = [self.setDeltas(dom)  if len(self.setDeltas(dom)) != 0 else (dom[-1],) for dom in dominios]  # Separación entre los nodos (Aquí hay que ver cómo es cuando tenemos un grid de 2x1x1 ya cuando se haga el FVM
-        self.__dominios = [tuple(dom) for dom in dominios]
-        self.__faces = [tuple((np.array(coords[:-1]) + np.array(coords[1:]))/2) for coords in self.__coords]
+        self.coords = [tuple(np.linspace(strt, stp, vol)) for strt, stp, vol in list(zip(start, stop, v))] # Meshgrid posible
+        dominios = [np.insert(arr,(0,len(arr)),[0, l[idx]]) for idx, arr in enumerate(self.coords)] # Coordenadas + fronteras
+        self.deltas = [self.setDeltas(dom)  if len(self.setDeltas(dom)) != 0 else (dom[-1],) for dom in dominios]  # Separación entre los nodos (Aquí hay que ver cómo es cuando tenemos un grid de 2x1x1 ya cuando se haga el FVM
+        self.dominios = [tuple(dom) for dom in dominios]
+        self.__faces = [tuple((np.array(coords[:-1]) + np.array(coords[1:]))/2) for coords in self.coords]
     
     
     def setDeltas(self, dominio):
@@ -148,9 +148,9 @@ class Mesh():
     
     # Creo que esto no se usará, pero estuvo chida la deducción, lo dejo de todos modos xd
     #def totalDomNodes(self):
-    #    d_1 = 6*self.__volumes[0] + 1
-    #    d_2 = self.__volumes[1]*d_1 - self.__volumes[0]*(self.__volumes[1] - 1)
-    #    d_3 = self.__volumes[2]*d_2 - self.__volumes[0]*self.__volumes[1]*(self.__volumes[2] - 1)
+    #    d_1 = 6*self.volumes[0] + 1
+    #    d_2 = self.volumes[1]*d_1 - self.volumes[0]*(self.volumes[1] - 1)
+    #    d_3 = self.volumes[2]*d_2 - self.volumes[0]*self.volumes[1]*(self.volumes[2] - 1)
     #    return d_3
     
     def init_tags_fronteras(self):
@@ -158,15 +158,15 @@ class Mesh():
         Método para etiquetar las fronteras dependiendo de la dimensión, sólo se les da la propiedad de existir o no
         existir.
         """
-        X, Y, Z = [len(dom) for dom in self.__dominios]
+        X, Y, Z = [len(dom) for dom in self.dominios]
         for z in range(Z):
             for y in range(Y):
                 for x in range(X):
                     t = b = n = s = "Off"
                     e = w = "ON"
-                    if self.__dim > 1: 
+                    if self.dim > 1: 
                         n = s = "ON"
-                        if self.__dim == 3: t = b = "ON"
+                        if self.dim == 3: t = b = "ON"
                     # El siguiente cacho de código es para saber si nos encontramos con una frontera
                     if x==0 or y==0 or z==0 or x==(X-1) or y==(Y-1) or z==(Z-1):
                         var = None
@@ -181,14 +181,14 @@ class Mesh():
                                 else: continue
                             else: continue
                             self.__tags_fronteras[f"{x}{y}{z}"] = {"frontera": {var: value},
-                                                 "coord": [self.__dominios[0][x], self.__dominios[1][y], self.__dominios[2][z]],
+                                                 "coord": [self.dominios[0][x], self.dominios[1][y], self.dominios[2][z]],
                                                                   "cond": {}} 
                         elif z != 0 and z != (Z - 1):
                             if x != 0 and x != (X - 1):
                                 if y == 0: var = "S"; value = s
                                 elif y == (Y - 1) : var = "N"; value = n
                                 self.__tags_fronteras[f"{x}{y}{z}"] = {"frontera": {var: value},
-                                                 "coord": [self.__dominios[0][x], self.__dominios[1][y], self.__dominios[2][z]],
+                                                 "coord": [self.dominios[0][x], self.dominios[1][y], self.dominios[2][z]],
                                                                       "cond": {}} 
                         else: continue
     
@@ -198,7 +198,7 @@ class Mesh():
         frontera, una 'F' cuando es una cara interna y un 'Off' cuando no se está contando esa cara por las dimensiones del 
         problema. 
         """
-        X, Y, Z = self.__volumes
+        X, Y, Z = self.volumes
         for z in range(1,Z+1):
             for y in range(1,Y+1):
                 for x in range(1,X+1):                   
@@ -206,17 +206,17 @@ class Mesh():
                     e = w = "F"
                     if x == 1: w = {}
                     elif x == X: e = {}
-                    if self.__dim > 1:
+                    if self.dim > 1:
                         n = s = "F"
                         if y == 1: s = {}
                         elif y == Y: n = {}
-                        if self.__dim == 3:
+                        if self.dim == 3:
                             t = b = "F"
                             if z == 1: b = {}
                             elif z == Z: t = {}
 
                     self.__tags[f"{x}{y}{z}"] = {"E": e, "W": w, "N": n, "S": s, "T": t, "B": b, 
-                                             "coord": [self.__dominios[0][x], self.__dominios[1][y], self.__dominios[2][z]]}
+                                             "coord": [self.dominios[0][x], self.dominios[1][y], self.dominios[2][z]]}
             
     def tag_wall(self, direction, tag, value):
         """
@@ -291,17 +291,17 @@ class Mesh():
         # Si 'dominio' no es tupla, transforma 'dominio' a la tupla unidimensional (dominio,)
         # Tendría que ser una tupla de tuplas/listas/arreglos para que sea válido.
         if not isinstance(dominio, (tuple, int, float)): # Creo que si es una lista o un arreglo, no funciona enteros o float
-            tupla = (tuple(dominio), self.__dominios[1], self.__dominios[2])
+            tupla = (tuple(dominio), self.dominios[1], self.dominios[2])
             dominio = tupla
         # Asigna los atributos de la mesh correspondientes    
-        self.__dominios = [tuple(dominio[i]) for i in range(3)]
-        self.__coords = [tuple(dominio[i][1:-1]) for i in range(3)]
-        self.__lengths = tuple([dominio[i][-1] for i in range(3)])
-        self.__volumes = tuple([len(dominio[i][1:-1]) for i in range(3)])
-        self.__deltas = [self.setDeltas(np.array(dominio[i])) for i in range(3)]
+        self.dominios = [tuple(dominio[i]) for i in range(3)]
+        self.coords = [tuple(dominio[i][1:-1]) for i in range(3)]
+        self.lengths = tuple([dominio[i][-1] for i in range(3)])
+        self.volumes = tuple([len(dominio[i][1:-1]) for i in range(3)])
+        self.deltas = [self.setDeltas(np.array(dominio[i])) for i in range(3)]
         
         if faces: self.__faces = faces
-        else: self.__faces = [tuple((np.array(coords[:-1]) + np.array(coords[1:]))/2) for coords in self.__coords]
+        else: self.__faces = [tuple((np.array(coords[:-1]) + np.array(coords[1:]))/2) for coords in self.coords]
             
         self.init_tags()
         self.init_tags_fronteras()
@@ -315,15 +315,15 @@ class Mesh():
         print('     MESH INFORMATION   ')
         print('=====================================')
         print("\nMesh type: Cartesian")
-        print(f"Number of dimensions of mesh: {self.__dim}")
+        print(f"Number of dimensions of mesh: {self.dim}")
         variables = "X Y Z".split()
-        for idx in range(self.__dim):
+        for idx in range(self.dim):
             var = variables[idx]
             print(f"\n ----- {var}-axis -----")
-            print(f"Number of {var.lower()} volumes: {self.__volumes[idx]}")
-            print(f"Lenght {var.lower()} of problem domain: {self.__lengths[idx]}")
-            print(f"List of {var.lower()} positions of volumes: \n{self.__coords[idx]}")
-            print(f"List of {var.lower()} positions of domain nodes: \n{self.__dominios[idx]}")
+            print(f"Number of {var.lower()} volumes: {self.volumes[idx]}")
+            print(f"Lenght {var.lower()} of problem domain: {self.lengths[idx]}")
+            print(f"List of {var.lower()} positions of volumes: \n{self.coords[idx]}")
+            print(f"List of {var.lower()} positions of domain nodes: \n{self.dominios[idx]}")
             
             
     def draw(self):
@@ -353,8 +353,8 @@ class Mesh():
         Gives the parameters needed for defining a staggered mesh via the 'setDominio()'
         method. The staggering it's made in the X axis.
         """
-        stgX = np.zeros(self.__volumes[0]+1)
-        stgX[-1] = self.__lengths[0]
+        stgX = np.zeros(self.volumes[0]+1)
+        stgX[-1] = self.lengths[0]
         stgX[1:-1] = 0.5*(self.X()[:-1] + self.X()[1:])
         return (stgX,self.dominioY(),self.dominioZ())
     
@@ -365,8 +365,8 @@ class Mesh():
         method. The staggering it's made in the Y axis.
         """
         
-        stgY=np.zeros(self.__volumes[1]+1)
-        stgY[-1]=self.__lengths[1]
+        stgY=np.zeros(self.volumes[1]+1)
+        stgY[-1]=self.lengths[1]
         stgY[1:-1]=0.5*(self.Y()[:-1]+self.Y()[1:])
         return (self.dominioX(),stgY,self.dominioZ())
     
@@ -377,8 +377,8 @@ class Mesh():
         method. The staggering it's made in the Z axis.
         """
         
-        stgZ=np.zeros(self.__volumes[2]+1)
-        stgZ[-1]=self.__lengths[2]
+        stgZ=np.zeros(self.volumes[2]+1)
+        stgZ[-1]=self.lengths[2]
         stgZ[1:-1]=0.5*(self.Z()[:-1]+self.Z()[1:])
         return (self.dominioX(),self.dominioY(),stgZ)
 
@@ -388,7 +388,7 @@ class Mesh():
         Returns a 3-dimensional numpy array containing all the value of the volumes,
          that is lenght times width times height, for each one.
          """
-        dim = self.__dim
+        dim = self.dim
         dx=self.deltaX() ; dy=self.deltaY() ; dz=self.deltaZ()
         dx_vol = (dx[1:]+dx[:-1])/2. 
         dy_vol = (dy[1:]+dy[:-1])/2.
@@ -405,7 +405,7 @@ class Mesh():
         the X direction. The numpy array contains an area for each volume. 
         """
         
-        dim = self.__dim
+        dim = self.dim
         dy=self.deltaY() ; dz=self.deltaZ()
         nvx=self.nvx()
         dy_vol = (dy[1:]+dy[:-1])/2.  #longitud y (ancho) del volumen de control
@@ -421,7 +421,7 @@ class Mesh():
         the Y direction. The numpy array contains an area for each volume. 
         """
 
-        dim = self.__dim
+        dim = self.dim
         dx=self.deltaX() ; dz=self.deltaZ()
         nvy=self.nvy()
         dx_vol = (dx[1:]+dx[:-1])/2.  #longitud y (ancho) del volumen de control
@@ -437,7 +437,7 @@ class Mesh():
         the Z direction. The numpy array contains an area for each volume. 
         """  
         
-        dim = self.__dim
+        dim = self.dim
         dx=self.deltaX() ; dy=self.deltaY()
         nvz=self.nvz()
         dx_vol = (dx[1:]+dx[:-1])/2.  #longitud y (ancho) del volumen de control
