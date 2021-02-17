@@ -17,71 +17,12 @@ class Mesh():
     dirichlet, neumann or source, accordingly. The atributes that are lists or arrays that contains an element 
     for every node, like the 'tags' atribute, are sorted sweeping in the X, then Y an finally Z diretion;
     e.g. tags=[tag1,tag2,tag3,tag4,tag5,...] corresponds to nodes coordinates sorted like [(1,1,1),(2,1,1),(3,1,1),(1,2,1),(2,2,1),...]
-    
-    
-    Methods:
-        constructor(dim,volumes,lenght): instance a mesh
-        totalDomNodes(): get the total number of nodes in the domain
-        uniformGrid(): set mesh atributes assuming the mesh is uniform (it might be used by the constructor)
-        uniformVector(li,nvi): returns the 'nvi' volumes postions, nodes positions and nodes separation for a line segment of lengh 'li'
-        setDominio(domino): set mesh atributes according to the nodes positions given by parameter 'dominio'
-        setDetlas(dominio): Obtain the separation between the positions if the array 'dominio'
-        totalDomNodes(): Get the total number of nodes
-        tagsWallsOff(): Define a tag Off for all the nodes not used in the defined dimension
-        NdomX(): get the number of nodes in the X direction
-        NdomY(): get the number of nodes in the Y direction
-        NdomZ(): get the number of nodes in the Z direction
-        info(): prints some relevant information about the mesh
-        createCoord(): create and stores as atributtes the nodes coordinates
-        delCoord(): delete the coordX,coordY and coordZ attributes
-        getCoord(): get the nodes coordinates
-        coordList(): get the nodes coordinates in a printable fashion
-        coordTags(): get the nodes coordinates and their respective tags
-        printCoordTags(includeOffs): get the nodes coordinates and their respective tags and prints them in a convenient way
-        
-    Attributes:
-        nvx: number of volumes in dimension X (int)
-        nvy: number of volumes in dimension Y (int)
-        nvz: number of volumes in dimension Z (int)
-        lx: length of the domain in the X direction (float)
-        ly: length of the domain in the Y direction (float)
-        lz: length of the domain in the Z direction (float)
-        X: list of 'x' coordinates, without repetition, of volumes (list of floats or numpy array)
-        Y: list of 'y' coordinates, without repetition, of volumes (list of floats or numpy array)
-        Z: list of 'z' coordinates, without repetition, of volumes (list of floats or numpy array)
-        dominioX: list of 'x' coordinates, without repetition, of nodes (list of floats or numpy array)
-        dominioY: list of 'y' coordinates, without repetition, of nodes (list of floats or numpy array)
-        dominioZ: list of 'z' coordinates, without repetition, of nodes (list of floats or numpy array)
-        deltaX: list of separations between the 'dominioX' elements (numpy array)
-        deltaY: list of separations between the 'dominioY' elements (numpy array)
-        deltaZ: list of separations between the 'dominioZ' elements (numpy array)
-        coordX: sorted list of 'x' coordinates, with repetition, of nodes (numpy array)
-        coordY: sorted list of 'y' coordinates, with repetition, of nodes (numpy array)
-        coordZ: sorted list of 'z' coordinates, with repetition, of nodes (numpy array)
-        dirichTagDict: dictionary representing the relation between the dirichlet tags and their values (dictionary)
-        neumTagDict: dictionary representing the relation between the neumann tags and their values (dictionary)
-        sourcTagDict: dictionary representing the relation between the source tags and their values (dictionary)
-        dim: number of dimensions in the physical domain (int)
-        volumes: number of volumes in each dimension (tuple of ints or int)
-        lengths: lenght of domain in each dimension (tuple of ints or int)
-        tags: sorted list that has all the nodes tags (list of strings)
-        autoMesh: flag to indicate whether coordinates were calculated automatically using the volumes and lengths attributes (True/False)
-        emptyCoord: flag to indicate whether the coordinates are left unstored or not (True/False)
-        pressed: flag that becomes True when the mesh, and its properties, wont require any changes (True/False)
-        intWallVols:
-        hasWallW: list of all the nodes index; 0,1,2,3,...,etc, that have a Wall in their West node (list)
-        hasWallE: list of all the nodes index, that have a Wall in their East node (list)
-        hasWallN: list of all the nodes index, that have a Wall in their North node, the list is empty if dim=1 (list)
-        hasWallS: list of all the nodes index, that have a Wall in their South node, the list is empty if dim=1 (list)
-        hasWallT: list of all the nodes index, that have a Wall in their Top node, the list is empty if dim<3 (list)
-        hasWallB: list of all the nodes index, that have a Wall in their Bottom node, the list is empty if dim<3 (list)
-        
     """
     
     def __init__(self, dim, volumes = None, lengths = None):
         """
         Constructor of the Mesh class. If the parameters 'volumes' and 'lengths' are given then 
-        the instance atributes are defined assuming the mesh is uniform via the uniformGrid() method.
+        the instance atributes are defined assuming the mesh is uniform via the uniform_grid() method.
         When volumes or lenghts are leaved as None then the domain nodes must be defined 
         using setDmonio() just after making the instance of the class.
 
@@ -124,12 +65,12 @@ class Mesh():
         
         # if volumes and lengths are given, initialize values acording to dimension
         if (volumes and lengths):       
-            self.uniformGrid()
+            self.uniform_grid()
             self.init_tags()
             self.init_tags_fronteras()
     
     
-    def uniformGrid(self):
+    def uniform_grid(self):
         l = np.array(self.lengths) # Para el manejo con numpy
         v = np.array(self.volumes)
         d = l/v # Separación entre todos los nodos de cada dimensión
@@ -137,15 +78,19 @@ class Mesh():
         stop = l-d/2 # La frontera "final" del arreglo
         self.coords = [tuple(np.linspace(strt, stp, vol)) for strt, stp, vol in list(zip(start, stop, v))] # Meshgrid posible
         dominios = [np.insert(arr,(0,len(arr)),[0, l[idx]]) for idx, arr in enumerate(self.coords)] # Coordenadas + fronteras
-        self.deltas = [self.setDeltas(dom)  if len(self.setDeltas(dom)) != 0 else (dom[-1],) for dom in dominios]  # Separación entre los nodos (Aquí hay que ver cómo es cuando tenemos un grid de 2x1x1 ya cuando se haga el FVM
+        self.deltas = [self.set_deltas(dom)  if len(self.set_deltas(dom)) != 0 else (dom[-1],) for dom in dominios]  # Separación entre los nodos (Aquí hay que ver cómo es cuando tenemos un grid de 2x1x1 ya cuando se haga el FVM
         self.dominios = [tuple(dom) for dom in dominios]
-        self.__faces = [tuple((np.array(coords[:-1]) + np.array(coords[1:]))/2) for coords in self.coords]
+        self.faces = [tuple((np.array(coords[:-1]) + np.array(coords[1:]))/2) for coords in self.coords]
+        self.get_deltas_faces()
     
     
-    def setDeltas(self, dominio):
+    def set_deltas(self, dominio):
+        """
+        Método para obtener la distancia que hay entre los nodos
+        """
         return tuple((dominio[1:]-dominio[:-1])[1:-1])
-    
-    
+
+
     # Creo que esto no se usará, pero estuvo chida la deducción, lo dejo de todos modos xd
     #def totalDomNodes(self):
     #    d_1 = 6*self.volumes[0] + 1
@@ -298,14 +243,28 @@ class Mesh():
         self.coords = [tuple(dominio[i][1:-1]) for i in range(3)]
         self.lengths = tuple([dominio[i][-1] for i in range(3)])
         self.volumes = tuple([len(dominio[i][1:-1]) for i in range(3)])
-        self.deltas = [self.setDeltas(np.array(dominio[i])) for i in range(3)]
+        self.deltas = [self.set_deltas(np.array(dominio[i])) for i in range(3)]
         
-        if faces: self.__faces = faces
-        else: self.__faces = [tuple((np.array(coords[:-1]) + np.array(coords[1:]))/2) for coords in self.coords]
+        if faces: self.faces = faces
+        else: self.faces = [tuple((np.array(coords[:-1]) + np.array(coords[1:]))/2) for coords in self.coords]
+        self.get_deltas_faces()
             
         self.init_tags()
         self.init_tags_fronteras()
     
+    def get_deltas_faces(self):
+        self.deltas_faces = []
+        faces = [np.array(caras) for caras in self.faces]
+        dominio = [np.array(doms) for doms in self.dominios]
+        for direction in range(3):
+             if not self.faces[direction]:
+                    self.deltas_faces.append(self.lenghts[direction])
+            else:
+                extremo1 = faces[direction][0] - dominio[direction][0]
+                extremo2 = dominio[direction][-1] - faces[direction][-1]
+                interior = faces[direction][1:] - faces[direction][:-1]
+                self.deltas_faces.append(np.array([extremo1] + list(interior) + [extremo2]))
+
     
     def info(self):
         """
@@ -399,50 +358,37 @@ class Mesh():
         vols_dim_grid = np.meshgrid(dy_vol,dz_vol,dx_vol)
         return vols_dim_grid[0]*vols_dim_grid[1]*vols_dim_grid[2]
     
+    def get_area(self, direction = 0):
+        """
+        Método que regresa las áreas del volumen en la dirección indicada
+        """
+        perpendicular = [i for i in [range(3)] if i != direction]
+        nv = self.volumes[direction]
+        deltas_faces = self.get_deltas_faces
+        arreglo = [np.array([]) for _ in range(3)]
+        arreglo[direction] = np.ones(nv)
+        for idx, i in enumerate(perpendicular):
+            arreglo[i] = deltas_faces[idx]
+        areas_grid =np.meshgrid(arreglo[0], arreglo[1], arreglo[2])
+        return areas_grid[perpendicular[0]]*areas_grid[perpendicular[1]]
+
     def areas_x(self):
         """
         Returns a 3-dimensional numpy array containing the areas of the faces in
         the X direction. The numpy array contains an area for each volume. 
         """
-        
-        dim = self.dim
-        dy=self.deltaY() ; dz=self.deltaZ()
-        nvx=self.nvx()
-        dy_vol = (dy[1:]+dy[:-1])/2.  #longitud y (ancho) del volumen de control
-        dz_vol = (dz[1:]+dz[:-1])/2.  #longitud z (alto) del volumen de control
-        if dim >1: dy_vol[-1] += 0.5*dy[-1] ; dy_vol[0] += 0.5*dy[0]
-        if dim >2: dz_vol[-1] += 0.5*dz[-1] ; dz_vol[0] += 0.5*dz[0]
-        areas_grid =np.meshgrid(dy_vol,dz_vol,np.ones(nvx) )
-        return areas_grid[0]*areas_grid[1]
+        return self.get_area()
 
     def areas_y(self):
         """
         Returns a 3-dimensional numpy array containing the areas of the faces in
         the Y direction. The numpy array contains an area for each volume. 
         """
-
-        dim = self.dim
-        dx=self.deltaX() ; dz=self.deltaZ()
-        nvy=self.nvy()
-        dx_vol = (dx[1:]+dx[:-1])/2.  #longitud y (ancho) del volumen de control
-        dz_vol = (dz[1:]+dz[:-1])/2.  #longitud z (alto) del volumen de control
-        dx_vol[-1] += 0.5*dx[-1] ; dx_vol[0] += 0.5*dx[0]
-        if dim >2: dz_vol[-1] += 0.5*dz[-1] ; dz_vol[0] += 0.5*dz[0]
-        areas_grid =np.meshgrid(np.ones(nvy),dz_vol, dx_vol)
-        return areas_grid[2]*areas_grid[1]
+        return self.get_area(direction=1)
 
     def areas_z(self):
         """
         Returns a 3-dimensional numpy array containing the areas of the faces in
         the Z direction. The numpy array contains an area for each volume. 
         """  
-        
-        dim = self.dim
-        dx=self.deltaX() ; dy=self.deltaY()
-        nvz=self.nvz()
-        dx_vol = (dx[1:]+dx[:-1])/2.  #longitud y (ancho) del volumen de control
-        dy_vol = (dy[1:]+dy[:-1])/2.  #longitud y (ancho) del volumen de control
-        dx_vol[-1] += 0.5*dx[-1] ; dx_vol[0] += 0.5*dx[0]
-        if dim >1: dy_vol[-1] += 0.5*dy[-1] ; dy_vol[0] += 0.5*dy[0]
-        areas_grid =np.meshgrid(dy_vol,np.ones(nvz),dx_vol )
-        return areas_grid[2]*areas_grid[0]
+        return self.get_area(direction=2)
