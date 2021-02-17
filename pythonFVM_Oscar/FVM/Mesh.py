@@ -54,7 +54,7 @@ class Mesh():
         if isinstance(volumes, int):  self.volumes = (volumes, 1, 1)
         if isinstance(lengths, (int, float)):  self.lengths = (lengths, lengths/10, lengths/10)
         
-        # Si los parámetros son tuplas (pero no necesariamente sería una tupla de 3, arreglamos eso:
+        # Si los parámetros son tuplas (pero no necesariamente sería una tupla de 3), arreglamos eso:
         if isinstance(volumes, tuple):
             faltan = 3 - len(volumes)
             self.volumes = volumes + tuple([1 for i in range(faltan)])
@@ -78,9 +78,12 @@ class Mesh():
         stop = l-d/2 # La frontera "final" del arreglo
         self.coords = [tuple(np.linspace(strt, stp, vol)) for strt, stp, vol in list(zip(start, stop, v))] # Meshgrid posible
         dominios = [np.insert(arr,(0,len(arr)),[0, l[idx]]) for idx, arr in enumerate(self.coords)] # Coordenadas + fronteras
-        self.deltas = [self.set_deltas(dom)  if len(self.set_deltas(dom)) != 0 else (dom[-1],) for dom in dominios]  # Separación entre los nodos (Aquí hay que ver cómo es cuando tenemos un grid de 2x1x1 ya cuando se haga el FVM
+        # Separación entre los nodos (Aquí hay que ver cómo es cuando tenemos un grid de 2x1x1 ya cuando se haga el FVM
+        self.deltas = [self.set_deltas(dom)  if len(self.set_deltas(dom)) != 0 else (dom[-1],) for dom in dominios]
         self.dominios = [tuple(dom) for dom in dominios]
-        self.faces = [tuple((np.array(coords[:-1]) + np.array(coords[1:]))/2) for coords in self.coords]
+        #self.faces = [tuple((np.array(coords[:-1]) + np.array(coords[1:]))/2) for coords in self.coords]
+        self.faces = [(self.dominios[idx][0],) + tuple((np.array(coords[:-1]) + np.array(coords[1:]))/2) \
+                          + (self.dominios[idx][-1],) for idx, coords in enumerate(self.coords)]
         self.get_deltas_faces()
     
     
@@ -245,10 +248,18 @@ class Mesh():
         self.volumes = tuple([len(dominio[i][1:-1]) for i in range(3)])
         self.deltas = [self.set_deltas(np.array(dominio[i])) for i in range(3)]
         
-        if faces: self.faces = faces
-        else: self.faces = [tuple((np.array(coords[:-1]) + np.array(coords[1:]))/2) for coords in self.coords]
+        if faces: 
+            # Si me está pasando una lista (o sea, es de una dimensión)
+            if isinstance(faces[0], (int, float)):
+                self.faces = tuple(dominio[0]) + tuple(faces) + tuple(dominio[-1])
+            else: # Suponemos aquí que nos está pasando una lista de listas (o tupla de tuplas)
+                for idx, face_1dim in enumerate(faces):
+                    faces[idx] = list(dominio[idx][0]) + tuple(face_1dim) + tuple(dominio[idx][-1])
+                self.faces = faces
+        else: 
+            self.faces = [(self.dominios[idx][0],) + tuple((np.array(coords[:-1]) + np.array(coords[1:]))/2) \
+                          + (self.dominios[idx][-1],) for idx, coords in enumerate(self.coords)]
         self.get_deltas_faces()
-            
         self.init_tags()
         self.init_tags_fronteras()
     
@@ -257,14 +268,11 @@ class Mesh():
         faces = [np.array(caras) for caras in self.faces]
         dominio = [np.array(doms) for doms in self.dominios]
         for direction in range(3):
-             if not self.faces[direction]:
-                    self.deltas_faces.append(self.lenghts[direction])
-            else:
-                extremo1 = faces[direction][0] - dominio[direction][0]
-                extremo2 = dominio[direction][-1] - faces[direction][-1]
-                interior = faces[direction][1:] - faces[direction][:-1]
-                self.deltas_faces.append(np.array([extremo1] + list(interior) + [extremo2]))
-
+            #if not self.faces[direction]:
+                #self.deltas_faces.append(self.lengths[direction])
+            #else:
+            self.deltas_faces.append(faces[direction][1:] - faces[direction][:-1])
+                
     
     def info(self):
         """
@@ -305,41 +313,6 @@ class Mesh():
         fig.add_trace(go.Scatter3d(x = coord[0], y = coord[1], z = coord[2],
                                               mode = 'markers', marker = dict(color = "blue", size = 5)))
         fig.show()
-    
-    
-    def u_stag_def(self):
-        """
-        Gives the parameters needed for defining a staggered mesh via the 'setDominio()'
-        method. The staggering it's made in the X axis.
-        """
-        stgX = np.zeros(self.volumes[0]+1)
-        stgX[-1] = self.lengths[0]
-        stgX[1:-1] = 0.5*(self.X()[:-1] + self.X()[1:])
-        return (stgX,self.dominioY(),self.dominioZ())
-    
-    
-    def v_stag_def(self):
-        """
-        Gives the parameters needed for defining a staggered mesh via the 'setDominio()'
-        method. The staggering it's made in the Y axis.
-        """
-        
-        stgY=np.zeros(self.volumes[1]+1)
-        stgY[-1]=self.lengths[1]
-        stgY[1:-1]=0.5*(self.Y()[:-1]+self.Y()[1:])
-        return (self.dominioX(),stgY,self.dominioZ())
-    
-    
-    def w_stag_def(self):
-        """
-        Gives the parameters needed for defining a staggered mesh via the 'setDominio()'
-        method. The staggering it's made in the Z axis.
-        """
-        
-        stgZ=np.zeros(self.volumes[2]+1)
-        stgZ[-1]=self.lengths[2]
-        stgZ[1:-1]=0.5*(self.Z()[:-1]+self.Z()[1:])
-        return (self.dominioX(),self.dominioY(),stgZ)
 
 
     def vols(self):
@@ -362,14 +335,18 @@ class Mesh():
         """
         Método que regresa las áreas del volumen en la dirección indicada
         """
-        perpendicular = [i for i in [range(3)] if i != direction]
-        nv = self.volumes[direction]
-        deltas_faces = self.get_deltas_faces
+        perpendicular = [i for i in range(3) if i != direction]
+        num_fronteras = self.volumes[direction] + 1
         arreglo = [np.array([]) for _ in range(3)]
-        arreglo[direction] = np.ones(nv)
-        for idx, i in enumerate(perpendicular):
-            arreglo[i] = deltas_faces[idx]
-        areas_grid =np.meshgrid(arreglo[0], arreglo[1], arreglo[2])
+        arreglo[direction] = np.ones(num_fronteras)
+        for i in perpendicular:
+            arreglo[i] = self.deltas_faces[i]
+        areas_grid = np.meshgrid(arreglo[1], arreglo[0], arreglo[2])
+        for idx, perp in enumerate(perpendicular):
+            if perp == 0:
+                perpendicular[idx] = 1
+            elif perp == 1:
+                perpendicular[idx] = 0
         return areas_grid[perpendicular[0]]*areas_grid[perpendicular[1]]
 
     def areas_x(self):

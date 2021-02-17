@@ -58,34 +58,34 @@ class Coefficients():
     """    
 
     def __init__(self, mesh):
-        
-        self._dim = mesh.dim()
+        self._dim = mesh.dim
         self._mesh = mesh
-        self._N = ( mesh.nvx() * mesh.nvy() * mesh.nvz() )
-        self._nvzyx = mesh.nvzyx()
-        self._Su = np.zeros(self._nvzyx)  ;  self._Sp = None
+        self._volumes = mesh.volumes
+        #self._nvzyx = mesh.volumes[::-1]
+        self._Su = np.zeros(self._volumes)  ;  self._Sp = None
         self._aN = None ; self._aS = None ; self._aT = None ; self._aB = None
-        self.alloc_a()
+        self.init_coefs()
         
-    def alloc_a(self):
+    def init_coefs(self):
+        """
+        Método que inicializa los coeficientes en un arreglo tridimensional
+        """
         
-        """ Depending on the dimension of the physical domain, this method initialize
-        the coefficients as 3D arrays full of zeros"""
-        
-        nvzyx = self._nvzyx
-        self._aP = np.zeros(nvzyx)
+        #nvzyx = self._nvzyx
+        vols = self._volumes
+        self._aP = np.zeros(vols)
         dim = self._dim
-        self._aE = np.zeros(nvzyx)
-        self._aW = np.zeros(nvzyx)
+        self._aE = np.zeros(vols)
+        self._aW = np.zeros(vols)
         if dim > 1:
-            self._aN = np.zeros(nvzyx)
-            self._aS = np.zeros(nvzyx)
+            self._aN = np.zeros(vols)
+            self._aS = np.zeros(vols)
         if dim == 3:
-            self._aT = np.zeros(nvzyx)
-            self._aB = np.zeros(nvzyx)
+            self._aT = np.zeros(vols)
+            self._aB = np.zeros(vols)
               
 
-    def setSu(self, su):
+    def set_su(self, Su):
         """
         Set the 'Su' attribute as a 3D array by taking the parameter 'su'
         given and multiplying it with the volumes volumes. The parameter 'su'
@@ -98,21 +98,21 @@ class Coefficients():
         """        
         mesh = self._mesh
         vols = mesh.vols()
-        self._Su = vols * su
+        self._Su = vols * Su
         
-    def saveAsSu(self, su):
+    def save_as_su(self, Su):
         """
 
         """        
-        self._Su = su
+        self._Su = Su
         
-    def saveSu(self, su):
+    def save_su(self, Su):
         """
 
         """        
-        self._Su = su
+        self._Su = Su
 
-    def setSp(self, sp):
+    def set_sp(self, Sp):
         """
         Set the 'Sp' attribute as a 3D array by taking the parameter 'sp'
         given and multiplying it with the volumes volumes. The parameter 'sp'
@@ -128,33 +128,32 @@ class Coefficients():
         ####-----------No es necesario guardar el atributo Sp ----#######
         ## Para ahorrar memoria se puede corregir aP sin guardar Sp en memoria ##
         vols = mesh.vols()
-        self._Sp = vols * sp
+        self._sP = vols * Sp
         self._aP -= self._Sp
 
         
-    def setaP(self, aP):
+    def set_ap(self, aP):
         self._aP = aP
     
-    def setaE(self, aE):
+    def set_ae(self, aE):
         self._aE = aE
 
-    def setaW(self, aW):
+    def set_aw(self, aW):
         self._aW = aW
-        #self._aE = aW
 
-    def setaN(self, aN):
+    def set_an(self, aN):
         self._aN = aN
 
-    def setaS(self, aS):
+    def set_as(self, aS):
         self._aS = aS
 
-    def setaT(self, aT):
+    def set_at(self, aT):
         self._aT = aT
 
-    def setaB(self, aB):
+    def set_ab(self, aB):
         self._aB = aB
         
-    def setDiffusion(self, Gamma):
+    def set_diffusion(self, gamma):
         """This method makes an instance of the Diffusion class and uses it to
         update the aP,aE,aW, ... atributes.
         
@@ -165,24 +164,24 @@ class Coefficients():
         
         dim = self._dim
         malla = self._mesh
-        D = Diffusion(malla, Gamma)
-        DE = D.DE()
-        DW = D.DW()        
-        self._aE -= DE
-        self._aW -= DW
-        self._aP +=  DE + DW
+        diffusion = Diffusion(malla, gamma)
+        east_diff = diffusion.east_diffusion()
+        west_diff = diffusion.west_diffusion()
+        self._aE -= east_diff
+        self._aW -= west_diff
+        self._aP +=  east_diff + west_diff
         if dim > 1:
-            DN = D.DN()
-            DS = D.DS()
-            self._aN -= DN
-            self._aS -= DS
-            self._aP += DN + DS            
+            north_diff = diffusion.north_diffusion()
+            south_diff = diffusion.south_diffusion()
+            self._aN -= north_diff
+            self._aS -= south_diff
+            self._aP += north_diff + south_diff
         if dim == 3:
-            DT = D.DT()
-            DB = D.DB()
-            self._aT -= DT
-            self._aB -= DB
-            self._aP += DT + DB   
+            top_diff = diffusion.top_diffussion()
+            bottom_diff = D.DB()
+            self._aT -= top_diff
+            self._aB -= bottom_diff
+            self._aP += top_diff + bottom_diff
             
             
     def under(self, alpha, velComp):
@@ -190,7 +189,7 @@ class Coefficients():
         self._Su += (1. - alpha) * self._aP * velComp
         
             
-    def setTime(self, phi_old, dt, rho,scheme = 'implicit'):
+    def set_time(self, phi_old, dt, rho,scheme = 'implicit'):
         
         if scheme == 'implicit':
         
@@ -200,7 +199,7 @@ class Coefficients():
             self._aP += rv_t
             self._Su += phi_old * rv_t  ### Este paso podría sacarse de este método y meterse a un nuevo método para separar la modificacion a aP y a Su y así no tener que redefinir los coeficientes en cada paso temporal
 
-    def setTime2(self, dt, rho, scheme = 'implicit'):
+    def set_time2(self, dt, rho, scheme = 'implicit'):
         
         if scheme == 'implicit':
         
@@ -209,7 +208,7 @@ class Coefficients():
             rv_t = (rho * vols) / dt
             self._aP += rv_t
             
-    def doStepTime(self, phi_old, dt, rho, scheme = 'implicit'):
+    def do_step_time(self, phi_old, dt, rho, scheme = 'implicit'):
         
         if scheme == 'implicit':
         
@@ -218,40 +217,35 @@ class Coefficients():
             rv_t = (rho * vols) / dt
             self._Su += phi_old * rv_t 
             
-    def Su(self):
+    def get_sU(self):
         return self._Su
     
-    def Sp(self):
+    def get_sP(self):
         return self._Sp
     
-    def N(self):
+    def get_N(self):
         return self._N
     
-    def aP(self):
+    def get_aP(self):
         return self._aP
     
-    def aE(self):
+    def get_aE(self):
         return self._aE
     
-    def aW(self):
+    def get_aW(self):
         return self._aW
 
-    def aN(self):
+    def get_aN(self):
         return self._aN
 
-    def aS(self):
+    def get_aS(self):
         return self._aS
 
-    def aT(self):
+    def get_aT(self):
         return self._aT
 
-    def aB(self):
+    def get_aB(self):
         return self._aB
     
-    def mesh(self):
+    def get_mesh(self):
         return self._mesh
-    
-    def nvzyx(self):
-        return self._nvzyx
-    
-    

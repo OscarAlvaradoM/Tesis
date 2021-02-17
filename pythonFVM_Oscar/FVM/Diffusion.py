@@ -18,11 +18,11 @@ class Diffusion():
     coefficients due to the Diffusion term in the transport equation.
     """
     
-    def __init__(self, mesh, funcionGamma):
+    def __init__(self, mesh, gamma):
         """ 
         Saves the mesh and a function as attributes of the object.  
         
-        funcionGamma: function that can be evaluated to obtain the value of the difussion
+        gamma: function that can be evaluated to obtain the value of the difussion
         coeficient, Gamma, in a particular position, that is Gamma = f(x,y,z). If 
         funcionGamma is an int or float it is assumed that the difussion coefficient 
         is constant. (float/int/function)
@@ -30,87 +30,106 @@ class Diffusion():
         
         self._mesh = mesh
         self._gammaconstante = 0.
-        self._Gamma = None
+        self._gamma = None
         
-        if isinstance(funcionGamma,(int,float)):
-            self._gammaconstante = funcionGamma
-            self._Gamma = self.funcionConst
+        if isinstance(gamma, (int,float)):
+            self._gammaconstante = gamma
+            self._gamma = self.funcionConst
+        # Se asume que es una función en este caso
         else:
-            self._Gamma = funcionGamma
+            self._gamma = gamma
           
     
     def funcionConst(self, x, y, z):
         return self._gammaconstante
     
-    def DE(self):
+    def east_diffusion(self):
         """
         Gives a 3D numpy array that should be used to correct the aE coefficient 
         caused by the diffusion effect.
         """
         
         mesh = self._mesh
-        (y, z, x) = np.meshgrid(mesh.Y(), mesh.Z(), mesh.X())
-        dxe = mesh.dxe() # "Separations between the corresponding node and it's east neighbor." 
-        Gamma_e = self._Gamma(mesh.xe(x, dxe), y , z) # xe() -> x coordinate of the east border in the volume.
-        DE = Gamma_e * mesh.areasX() / dxe # areasX() -> "the areas of the faces in the X direction."
-        return DE
+        x, y, z = np.meshgrid(mesh.coords[0], mesh.coords[1], mesh.coords[2])
+        faces_x = mesh.faces[0]
+        δ_x = np.array(mesh.deltas[0] + (faces_x[-1] - mesh.coords[0][-1],))
+        gamma_e = self._gamma(faces_x[1:], y , z) # Usando todas las de la derecha (east)
+        areas = mesh.areas_x()[1:]
+        #areas[-1,:,:] = 0
+        east_d = gamma_e * areas / δ_x[:,None,None]
+        return east_d
 
-    def DW(self):
+    def west_diffusion(self):
         """
         Gives a 3D numpy array that should be used to correct the aW coefficient
         caused by the diffusion effect.
         """        
         mesh = self._mesh
-        (y, z, x) = np.meshgrid(mesh.Y(), mesh.Z(), mesh.X())
-        dxw = mesh.dxw() # "Separations between the corresponding node and it's west neighbor."
-        Gamma_w = self._Gamma(mesh.xw(x, dxw), y , z) # xw() -> "x coordinate of the west border in the volume."
-        DW = Gamma_w * mesh.areasX() / dxw # areasX() -> "the areas of the faces in the X direction."
-        return DW
+        x, y, z = np.meshgrid(mesh.coords[0], mesh.coords[1], mesh.coords[2])
+        faces_x = mesh.faces[0] 
+        δ_x = np.array((mesh.coords[0][0],) + mesh.deltas[0])
+        gamma_w = self._gamma(faces_x[:-1], y , z) # Usando todas las de la derecha (east)
+        areas = mesh.areas_x()[:-1]
+        #areas[0,:,:] = 0
+        west_d = gamma_w * areas / δ_x[:,None,None]
+        return west_d
 
-    def DN(self):
+    def north_difussion(self):
         """
         Gives a 3D numpy array that should be used to correct the aN coefficient
         caused by the diffusion effect.
         """
         mesh = self._mesh
-        (y, z, x) = np.meshgrid(mesh.Y(), mesh.Z(), mesh.X())
-        dyn = mesh.dyn() # "Separations between the corresponding node and it's north neighbor."
-        Gamma_n = self._Gamma(x, mesh.yn(y, dyn), z) # yn() -> "y coordinate of the north border in the volume."
-        DN = Gamma_n * mesh.areasY() / dyn # areasY() -> "the areas of the faces in the Y direction."
-        return DN
+        x, y, z = np.meshgrid(mesh.coords[0], mesh.coords[1], mesh.coords[2])
+        faces_y = mesh.faces[1]
+        δ_y = np.array(mesh.deltas[1] + (faces_y[-1] - mesh.coords[1][-1],))
+        gamma_n = self._gamma(x, faces_y[1:] , z) # Usando todas las de la derecha (east)
+        areas = mesh.areas_y()[1:]
+        #areas[-1,:,:] = 0
+        north_d = gamma_n * areas / δ_y[None,:,None]
+        return north_d
 
-    def DS(self):
+    def south_diffusion(self):
         """
         Gives a 3D numpy array that should be used to correct the aS coefficient
         caused by the diffusion effect.
         """
         mesh = self._mesh
-        (y, z, x) = np.meshgrid(mesh.Y(), mesh.Z(), mesh.X())
-        dys = mesh.dys() # "Separations between the corresponding node and it's south neighbor."
-        Gamma_s = self._Gamma(x, mesh.ys(y, dys), z) # ys() -> "y coordinate of the south border in the volume."
-        DS = Gamma_s * mesh.areasY() / dys # areasY() -> "the areas of the faces in the Y direction."
-        return DS
+        x, y, z = np.meshgrid(mesh.coords[0], mesh.coords[1], mesh.coords[2])
+        faces_y = mesh.faces[1] 
+        δ_y = np.array((mesh.coords[1][0],) + mesh.deltas[1])
+        gamma_s = self._gamma(x, faces_y[:-1] , z) # Usando todas las de la derecha (east)
+        areas = mesh.areas_y()[:-1]
+        #areas[0,:,:] = 0
+        south_d = gamma_s * areas / δ_y[None,:,None]
+        return south_d
 
-    def DT(self):
+    def top_diffusion(self):
         """
         Gives a 3D numpy array that should be used to correct the aT coefficient
         caused by the diffusion effect.
         """
         mesh = self._mesh
-        (y, z, x) = np.meshgrid(mesh.Y(), mesh.Z(), mesh.X())
-        dzt = mesh.dzt() # "Separations between the corresponding node and it's top neighbor."
-        Gamma_t = self._Gamma(x, y, mesh.zt(z, dzt)) # zt() -> "z coordinate of the top border in the volume."
-        DT = Gamma_t * mesh.areasZ() / dzt # areasZ() -> "the areas of the faces in the Z direction."
-        return DT
+        x, y, z = np.meshgrid(mesh.coords[0], mesh.coords[1], mesh.coords[2])
+        faces_z = mesh.faces[2]
+        δ_z = np.array(mesh.deltas[2] + (1,))
+        gamma_t = self._gamma(x, y, faces_z[1:]) # Usando todas las de la derecha (east)
+        areas = mesh.areas_z()[1:]
+        #areas[-1,:,:] = 0
+        top_d = gamma_t * areas / δ_y[None,None,:]
+        return top_d
 
-    def DB(self):
+    def bottom_diffusion(self):
         """
         Gives a 3D numpy array that should be used to correct the aB coefficient
         caused by the diffusion effect.
         """
         mesh = self._mesh
-        (y, z, x) = np.meshgrid(mesh.Y(), mesh.Z(), mesh.X())
-        dzb = mesh.dzb() # "Separations between the corresponding node and it's bottom neighbor."
-        Gamma_b = self._Gamma(x, y, mesh.zb(z, dzb)) # zt() -> "z coordinate of the top border in the volume."
-        DB = Gamma_b * mesh.areasZ() / dzb # areasZ() -> "the areas of the faces in the Z direction."
-        return DB
+        x, y, z = np.meshgrid(mesh.coords[0], mesh.coords[1], mesh.coords[2])
+        faces_z = mesh.faces[2]
+        δ_z = np.array((1,) + mesh.deltas[2])
+        gamma_b = self._gamma(x, y, faces_z[:-1]) # Usando todas las de la derecha (east)
+        areas = mesh.areas_z()[:-1]
+        #areas[0,:,:] = 0
+        bottom_d = gamma_b * areas / δ_z[None,None,:]
+        return bottom_d
