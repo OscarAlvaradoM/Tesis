@@ -36,7 +36,6 @@ class Diffusion():
         else:
             self._gamma = gamma
           
-    
     def funcionConst(self, x, y, z):
         return self._gammaconstante
     
@@ -52,8 +51,14 @@ class Diffusion():
         δ_x = δ_d_x_grid
         gamma_e = self._gamma(faces_x[1:], y , z) # Usando todas las de la derecha (east)
         areas = mesh.areas_x()
+        source = areas.copy()
+        areas[-1,:,:] = 0
+        source[:-1,:,:] = 0
         east_d = gamma_e * areas / δ_x
-        return east_d
+        sp = gamma_e * source / δ_x
+        condicion = malla.get_mask_boundaries(direction="E")
+        sp[-1:,:,:] = sp[-1:,:,:]*np.array(condicion).reshape(sp[-1:,:,:].shape)
+        return east_d, sp
 
     def west_diffusion(self):
         """
@@ -67,8 +72,14 @@ class Diffusion():
         δ_x = δ_d_x_grid
         gamma_w = self._gamma(faces_x[:-1], y , z) # Usando todas las de la izquierda (west)
         areas = mesh.areas_x()
+        source = areas.copy()
+        areas[0,:,:] = 0
+        source[1:,:,:] = 0
         west_d = gamma_w * areas / δ_x
-        return west_d
+        sp = gamma_w * source / δ_x
+        condicion = malla.get_mask_boundaries(direction="W")
+        sp[:1,:,:] = sp[:1,:,:]*np.array(condicion).reshape(sp[:1,:,:].shape)
+        return west_d, sp
 
     def north_diffusion(self):
         """
@@ -82,8 +93,14 @@ class Diffusion():
         δ_y = δ_d_y_grid
         gamma_n = self._gamma(x, faces_y[1:] , z) # Usando todas las de arriba (north)
         areas = mesh.areas_y()
+        source = areas.copy()
+        areas[:,-1,:] = 0
+        source[:,:-1,:] = 0
         north_d = gamma_n * areas / δ_y
-        return north_d
+        sp = gamma_n * source / δ_y
+        condicion = malla.get_mask_boundaries(direction="N")
+        sp[:,-1:,:] = sp[:,-1:,:]*np.array(condicion).reshape(sp[:,-1:,:].shape)
+        return north_d, sp
 
     def south_diffusion(self):
         """
@@ -97,8 +114,14 @@ class Diffusion():
         δ_y = δ_d_y_grid
         gamma_s = self._gamma(x, faces_y[:-1] , z) # Usando todas las de abajo (south)
         areas = mesh.areas_y()
+        source = areas.copy()
+        areas[:,0,:] = 0
+        source[:,1:,:] = 0
         south_d = gamma_s * areas / δ_y
-        return south_d
+        sp = gamma_s * source / δ_y
+        condicion = malla.get_mask_boundaries(direction="S")
+        sp[:,:1,:] = sp[:,:1,:]*np.array(condicion).reshape(sp[:,:1,:].shape)
+        return south_d, sp
 
     def top_diffusion(self):
         """
@@ -112,8 +135,14 @@ class Diffusion():
         δ_z = δ_d_z_grid
         gamma_t = self._gamma(x, y , faces_z[1:]) # Usando todas las superiores (top)
         areas = mesh.areas_z()
+        source = areas.copy()
+        areas[:,:,-1] = 0
+        source[:,:,:-1] = 0
         top_d = gamma_t * areas / δ_z
-        return top_d
+        sp = gamma_t * source / δ_z
+        condicion = malla.get_mask_boundaries(direction="T")
+        sp[:,:,-1:] = sp[:,:,-1:]*np.array(condicion).reshape(sp[:,:,-1:].shape)
+        return top_d, sp
 
     def bottom_diffusion(self):
         """
@@ -127,5 +156,11 @@ class Diffusion():
         δ_z = δ_d_z_grid
         gamma_b = self._gamma(x, y, faces_z[:-1]) # Usando todas las inferiores (bottom)
         areas = mesh.areas_z()
+        source = areas.copy()
+        areas[:,:,0] = 0
+        source[:,:,1:] = 0
         bottom_d = gamma_b * areas / δ_z
-        return bottom_d
+        sp = gamma_b * source / δ_z
+        condicion = malla.get_mask_boundaries(direction="B")
+        sp[:,:,:1] = sp[:,:,:1]*np.array(condicion).reshape(sp[:,:,:1].shape)
+        return bottom_d, sp

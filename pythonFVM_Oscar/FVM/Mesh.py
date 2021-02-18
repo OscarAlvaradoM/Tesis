@@ -231,6 +231,24 @@ class Mesh():
             else:
                 self.tag_wall(direction, "S", value)
                 
+                
+    def tag_wall_insulated(self, direction, coords=None):
+        """
+        Método para etiquetar fronteras con condición de aislamiento.
+        """
+        if coords:
+            for idx, key in enumerate(coords):
+                if key in list(self.__tags.keys()):
+                    self.__tags[key][direction[idx]]["I"] = None
+                elif key in list(self.__tags_fronteras.keys()):
+                    self.__tags_fronteras[key]["cond"]["I"] = None
+        else:
+            if isinstance(direction, list):
+                for idx, direct in enumerate(direction):
+                    self.tag_wall(direct, "I", None)
+            else:
+                self.tag_wall(direction, "I", None)
+                
     
     def set_dominio(self, dominio, faces=None):
         """
@@ -334,7 +352,7 @@ class Mesh():
         de frontera.
         """
         # Graficamos las fronteras, sean o no activas
-        dic_colors = {"D": "gold", "N": "red", "S": "magenta", "Off": "gray"}
+        dic_colors = {"D": "darkturquoise", "N": "red", "S": "magenta", "Off": "white", "I": "gray"}
         condiciones = [list(self.__tags_fronteras[key]["cond"].keys())[0] if list(self.__tags_fronteras[key]["frontera"].values())[0] == "ON" else "Off" for key in list(self.__tags_fronteras.keys())]
         colores = [dic_colors[cond] for cond in condiciones]
         # Obtenemos las coordenadas de las fronteras y de los nodos internos.
@@ -350,22 +368,6 @@ class Mesh():
         fig.show()
 
 
-    def vols(self):
-        """
-        Returns a 3-dimensional numpy array containing all the value of the volumes,
-         that is lenght times width times height, for each one.
-         """
-        dim = self.dim
-        dx=self.deltaX() ; dy=self.deltaY() ; dz=self.deltaZ()
-        dx_vol = (dx[1:]+dx[:-1])/2. 
-        dy_vol = (dy[1:]+dy[:-1])/2.
-        dz_vol = (dz[1:]+dz[:-1])/2.
-        dx_vol[-1] += 0.5*dx[-1] ; dx_vol[0] += 0.5*dx[0]
-        if dim >1: dy_vol[-1] += 0.5*dy[-1] ; dy_vol[0] += 0.5*dy[0]
-        if dim >2: dz_vol[-1] += 0.5*dz[-1] ; dz_vol[0] += 0.5*dz[0]
-        vols_dim_grid = np.meshgrid(dy_vol,dz_vol,dx_vol)
-        return vols_dim_grid[0]*vols_dim_grid[1]*vols_dim_grid[2]
-    
     def get_area(self, direction = 0):
         """
         Método que regresa las áreas del volumen en la dirección indicada
@@ -401,3 +403,13 @@ class Mesh():
         the Z direction. The numpy array contains an area for each volume. 
         """  
         return self.get_area(direction=2)
+    
+    def get_mask_boundaries(self, direction):
+        tags_fronteras = self.__tags_fronteras
+        condicion = []
+        dict_cond = {"I":0, "N":0, "D":1}
+        for tag in tags_fronteras:
+            if list(tags_fronteras[tag]["frontera"].keys())[0] == direction:
+                cond = list(tags_fronteras[tag]["cond"].keys())[0]
+                condicion.append(dict_cond[cond])
+        return condicion
