@@ -70,8 +70,6 @@ class Coefficients():
         """
         Método que inicializa los coeficientes en un arreglo tridimensional
         """
-        
-        #nvzyx = self._nvzyx
         vols = self._volumes
         self._aP = np.zeros(vols)
         dim = self._dim
