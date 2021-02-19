@@ -37,6 +37,7 @@ class Coefficients():
         self._aE = np.zeros(vols)
         self._aW = np.zeros(vols)
         self._Sp = np.zeros(vols)
+        self._Su = np.zeros(vols)
         if dim > 1:
             self._aN = np.zeros(vols)
             self._aS = np.zeros(vols)
@@ -56,36 +57,36 @@ class Coefficients():
         dim = self._dim
         malla = self._mesh
         diffusion = Diffusion(malla, gamma)
-        east_diff, source_e = diffusion.east_diffusion()
-        west_diff, source_w = diffusion.west_diffusion()
+        east_diff, sp_e, su_e = diffusion.east_diffusion()
+        west_diff, sp_w, su_w = diffusion.west_diffusion()
         self._aE -= east_diff
         self._aW -= west_diff
-        self._Sp -= source_e + source_w
+        self._Sp -= sp_e + sp_w
+        self._Su += su_e + su_w
         self._aP +=  self._aE + self._aW
         if dim > 1:
-            north_diff, source_n = diffusion.north_diffusion()
-            south_diff, source_s = diffusion.south_diffusion()
+            north_diff, sp_n, su_n = diffusion.north_diffusion()
+            south_diff, sp_s, su_s = diffusion.south_diffusion()
             self._aN -= north_diff
             self._aS -= south_diff
-            self._Sp -= source_n + source_s
+            self._Sp -= sp_n + sp_s
+            self._Su += su_n + su_s
             self._aP += self._aN + self._aS
         if dim == 3:
-            top_diff, source_t = diffusion.top_diffussion()
-            bottom_diff, source_b = diffusion.bottom_diffusion()
+            top_diff, sp_t, su_t = diffusion.top_diffussion()
+            bottom_diff, sp_b, su_b = diffusion.bottom_diffusion()
             self._aT -= top_diff
             self._aB -= bottom_diff
-            self._Sp -= source_t + source_b
+            self._Sp -= sp_t + sp_b
+            self._Su += su_t + su_b
             self._aP += top_diff + bottom_diff
         self._aP += self._Sp
             
-    def get_sU(self):
+    def get_Su(self):
         return self._Su
     
-    def get_sP(self):
+    def get_Sp(self):
         return self._Sp
-    
-    def get_N(self):
-        return self._N
     
     def get_aP(self):
         return self._aP
