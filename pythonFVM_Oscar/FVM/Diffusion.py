@@ -55,10 +55,19 @@ class Diffusion():
         areas[-1,:,:] = 0
         source[:-1,:,:] = 0
         east_d = gamma_e * areas / δ_x
+        # Aquí obtenemos Sp
         sp = gamma_e * source / δ_x
-        condicion = mesh.get_mask_boundaries(direction="E")
+        condicion = malla.get_mask_boundaries_Sp(direction="E")
         sp[-1:,:,:] = sp[-1:,:,:]*np.array(condicion).reshape(sp[-1:,:,:].shape)
-        return east_d, sp
+        
+        # Aquí obtenemos Su
+        conds_su = malla.get_mask_boundaries_Su(direction="E", gamma = self._gamma)
+        su = source
+        su[-1:,:,:] = su[-1:,:,:]*np.array(conds_su).reshape(su[-1:,:,:].shape)
+        div = δ_x[-1:,:,:]*np.array(condicion).reshape(su[-1:,:,:].shape)
+        div = np.where(div == 0., 1, div)
+        su[-1:,:,:] = su[-1:,:,:]/div
+        return east_d, sp, su
 
     def west_diffusion(self):
         """
@@ -76,10 +85,19 @@ class Diffusion():
         areas[0,:,:] = 0
         source[1:,:,:] = 0
         west_d = gamma_w * areas / δ_x
+        # Aquí obtenemos Sp
         sp = gamma_w * source / δ_x
-        condicion = mesh.get_mask_boundaries(direction="W")
+        condicion = malla.get_mask_boundaries_Sp(direction="W")
         sp[:1,:,:] = sp[:1,:,:]*np.array(condicion).reshape(sp[:1,:,:].shape)
-        return west_d, sp
+        
+        # Aquí obtenemos Su
+        conds_su = malla.get_mask_boundaries_Su(direction="W", gamma = self._gamma)
+        su = source
+        su[:1,:,:] = su[:1,:,:]*np.array(conds_su).reshape(su[:1,:,:].shape)
+        div = δ_x[:1,:,:]*np.array(condicion).reshape(su[:1,:,:].shape)
+        div = np.where(div == 0., 1, div)
+        su[:1,:,:] = su[:1,:,:]/div
+        return west_d, sp, su
 
     def north_diffusion(self):
         """
@@ -97,10 +115,19 @@ class Diffusion():
         areas[:,-1,:] = 0
         source[:,:-1,:] = 0
         north_d = gamma_n * areas / δ_y
+        # Aquí obtenemos Sp
         sp = gamma_n * source / δ_y
-        condicion = mesh.get_mask_boundaries(direction="N")
+        condicion = malla.get_mask_boundaries_Sp(direction="N")
         sp[:,-1:,:] = sp[:,-1:,:]*np.array(condicion).reshape(sp[:,-1:,:].shape)
-        return north_d, sp
+        
+        # Aquí obtenemos Su
+        conds_su = malla.get_mask_boundaries_Su(direction="N", gamma = self._gamma)
+        su = source
+        su[:,-1:,:] = su[:,-1:,:]*np.array(conds_su).reshape(su[:,-1:,:].shape)
+        div = δ_y[:,-1:,:]*np.array(condicion).reshape(su[:,-1:,:].shape)
+        div = np.where(div == 0., 1, div)
+        su[:,-1:,:] = su[:,-1:,:]/div
+        return north_d, sp, su
 
     def south_diffusion(self):
         """
@@ -118,10 +145,19 @@ class Diffusion():
         areas[:,0,:] = 0
         source[:,1:,:] = 0
         south_d = gamma_s * areas / δ_y
+        # Aquí obtenemos Sp
         sp = gamma_s * source / δ_y
-        condicion = mesh.get_mask_boundaries(direction="S")
+        condicion = malla.get_mask_boundaries_Sp(direction="S")
         sp[:,:1,:] = sp[:,:1,:]*np.array(condicion).reshape(sp[:,:1,:].shape)
-        return south_d, sp
+        
+        # Aquí obtenemos Su
+        conds_su = malla.get_mask_boundaries_Su(direction="S", gamma = self._gamma)
+        su = source
+        su[:,:1,:] = su[:,:1,:]*np.array(conds_su).reshape(su[:,:1,:].shape)
+        div = δ_y[:,:1,:]*np.array(condicion).reshape(su[:,:1,:].shape)
+        div = np.where(div == 0., 1, div)
+        su[:,:1,:] = su[:,:1,:]/div
+        return south_d, sp, su
 
     def top_diffusion(self):
         """
@@ -139,10 +175,21 @@ class Diffusion():
         areas[:,:,-1] = 0
         source[:,:,:-1] = 0
         top_d = gamma_t * areas / δ_z
+        # Aquí obtenemos Sp
         sp = gamma_t * source / δ_z
-        condicion = mesh.get_mask_boundaries(direction="T")
+        condicion = malla.get_mask_boundaries_Sp(direction="T")
         sp[:,:,-1:] = sp[:,:,-1:]*np.array(condicion).reshape(sp[:,:,-1:].shape)
-        return top_d, sp
+        
+        # Aquí obtenemos Su
+        conds_su = malla.get_mask_boundaries_Su(direction="T", gamma = self._gamma)
+        su = source
+        su[:,:,-1:] = su[:,:,-1:]*np.array(conds_su).reshape(su[:,:,-1:].shape)
+        print("Su_t:", su, su.shape)
+        print("δ_z_t", δ_z, δ_z.shape)
+        div = δ_z[:,:,-1:]*np.array(condicion).reshape(su[:,:,-1:].shape)
+        div = np.where(div == 0., 1, div)
+        su[:,:,-1:] = su[:,:,-1:]/div
+        return top_d, sp, su
 
     def bottom_diffusion(self):
         """
@@ -160,7 +207,18 @@ class Diffusion():
         areas[:,:,0] = 0
         source[:,:,1:] = 0
         bottom_d = gamma_b * areas / δ_z
+        # Aquí obtenemos Sp
         sp = gamma_b * source / δ_z
-        condicion = mesh.get_mask_boundaries(direction="B")
+        condicion = malla.get_mask_boundaries_Sp(direction="B")
         sp[:,:,:1] = sp[:,:,:1]*np.array(condicion).reshape(sp[:,:,:1].shape)
-        return bottom_d, sp
+        
+        # Aquí obtenemos Su
+        conds_su = malla.get_mask_boundaries_Su(direction="B", gamma = self._gamma)
+        su = source
+        su[:,:,:1] = su[:,:,:1]*np.array(conds_su).reshape(su[:,:,:1].shape)
+        print("Su_b:", su, su.shape)
+        print("δ_z_b", δ_z, δ_z.shape)
+        div = δ_z[:,:,:1]*np.array(condicion).reshape(su[:,:,:1].shape)
+        div = np.where(div == 0., 1, div)
+        su[:,:,:1] = su[:,:,:1]/div
+        return bottom_d, sp, su
