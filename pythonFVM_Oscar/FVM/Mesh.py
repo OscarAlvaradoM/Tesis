@@ -286,7 +286,7 @@ class Mesh():
         self.init_tags_fronteras()
         self.get_grids()
     
-    def get_grid_deltas_dominios(self, axis=0, orientation="e"):
+    def get_grid_deltas_dominios(self, axis=0, orientation="E"):
         deltas_dominios = []
         self.grid_deltas_dominios = np.array([])
         dominios = [np.array(dom) for dom in self.dominios]
@@ -299,7 +299,7 @@ class Mesh():
                     deltas_dominios.append(coords[direction])
             else:
                 deltas_dominios.append(dominios[direction][1:] - dominios[direction][:-1])
-        if orientation == "e" or orientation == "n" or orientation == "t":
+        if orientation == "E" or orientation == "N" or orientation == "T":
             deltas_dominios[axis] = deltas_dominios[axis][1:]
         else:
             deltas_dominios[axis] = deltas_dominios[axis][:-1]
