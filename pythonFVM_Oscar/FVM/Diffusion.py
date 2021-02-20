@@ -39,34 +39,60 @@ class Diffusion():
     def funcionConst(self, x, y, z):
         return self._gammaconstante
     
+    def get_diffusion_coef(self, direction):
+        """
+        Gives a 3D numpy array that should be used to correct the aB coefficient
+        caused by the diffusion effect.
+        """
+        idx, idx_1 = 0,0
+        if direction in ["E", "N", "T"]: idx_1=-1
+        if direction in ["N", "S"]: idx=1
+        elif direction in ["T", "B"]: idx = 2
+        mesh = self._mesh
+        faces = mesh.faces[idx]
+        x, y, z = np.meshgrid(mesh.coords[0], mesh.coords[1], mesh.coords[2])
+        
+        # Para obtener los coeficientes
+        δ_d_grid = mesh.get_grid_deltas_dominios(axis=idx, orientation=direction)
+        δ = δ_d_grid[idx]
+        λ_1 = lambda x, d: x[1:] if d in ["E","N","T"] else x[:-1]
+        coord = [var if i!=idx else λ_1(faces, direction) for (i, var) in enumerate([x,y,z])]
+        gamma = self._gamma(coord[0], coord[1], coord[2])
+        areas = mesh.get_area(direction=idx)
+        source = areas.copy()
+        coord_2 = [slice(None,None) if var!=idx else idx_1 for var in range(3)]
+        areas[coord_2[0],coord_2[1],coord_2[2]] = 0
+        λ_2 = lambda d: slice(None,-1) if d in ["E","N","T"] else slice(1,None)
+        coord_3 = [slice(None,None) if var!=idx else λ_2(direction) for var in range(3)]
+        source[coord_3[0],coord_3[1],coord_3[2]] = 0
+        diff = gamma * areas / δ
+
+        # Aquí obtenemos Sp
+        sp = gamma * source / δ
+        condicion = mesh.get_mask_boundaries_Sp(direction)
+        λ_3 = lambda d: slice(-1,None) if d in ["E","N","T"] else slice(None,1)
+        coord_4 = [slice(None,None) if var!=idx else λ_3(direction) for var in range(3)]
+        tmp_sp = sp[coord_4[0],coord_4[1],coord_4[2]]
+        sp[coord_4[0],coord_4[1],coord_4[2]] = tmp_sp*np.array(condicion).reshape(tmp_sp.shape)
+        
+        # Aquí obtenemos Su
+        conds_su = mesh.get_mask_boundaries_Su(direction, gamma = self._gamma)
+        su = source
+        tmp_su = su[coord_4[0],coord_4[1],coord_4[2]]
+        su[coord_4[0],coord_4[1],coord_4[2]] = tmp_su*np.array(conds_su).reshape(tmp_su.shape)
+        tmp_su = su[coord_4[0],coord_4[1],coord_4[2]]
+        div = δ[coord_4[0],coord_4[1],coord_4[2]]*np.array(condicion).reshape(tmp_su.shape)
+        div = np.where(div == 0., 1, div)
+        su[coord_4[0],coord_4[1],coord_4[2]] = tmp_su/div
+        return diff, sp, su
+    
+    
     def east_diffusion(self):
         """
         Gives a 3D numpy array that should be used to correct the aE coefficient 
         caused by the diffusion effect.
         """
-        mesh = self._mesh
-        faces_x = mesh.faces[0]
-        x, y, z = np.meshgrid(mesh.coords[0], mesh.coords[1], mesh.coords[2])
-        δ_d_x_grid, δ_d_y_grid, δ_d_z_grid = mesh.get_grid_deltas_dominios(axis=0, orientation="e")
-        δ_x = δ_d_x_grid
-        gamma_e = self._gamma(faces_x[1:], y , z) # Usando todas las de la derecha (east)
-        areas = mesh.areas_x()
-        source = areas.copy()
-        areas[-1,:,:] = 0
-        source[:-1,:,:] = 0
-        east_d = gamma_e * areas / δ_x
-        # Aquí obtenemos Sp
-        sp = gamma_e * source / δ_x
-        condicion = mesh.get_mask_boundaries_Sp(direction="E")
-        sp[-1:,:,:] = sp[-1:,:,:]*np.array(condicion).reshape(sp[-1:,:,:].shape)
-        
-        # Aquí obtenemos Su
-        conds_su = mesh.get_mask_boundaries_Su(direction="E", gamma = self._gamma)
-        su = source
-        su[-1:,:,:] = su[-1:,:,:]*np.array(conds_su).reshape(su[-1:,:,:].shape)
-        div = δ_x[-1:,:,:]*np.array(condicion).reshape(su[-1:,:,:].shape)
-        div = np.where(div == 0., 1, div)
-        su[-1:,:,:] = su[-1:,:,:]/div
+        east_d, sp, su = self.get_diffusion_coef("E")
         return east_d, sp, su
 
     def west_diffusion(self):
@@ -74,29 +100,7 @@ class Diffusion():
         Gives a 3D numpy array that should be used to correct the aW coefficient
         caused by the diffusion effect.
         """        
-        mesh = self._mesh
-        faces_x = mesh.faces[0]
-        x, y, z = np.meshgrid(mesh.coords[0], mesh.coords[1], mesh.coords[2])
-        δ_d_x_grid, δ_d_y_grid, δ_d_z_grid = mesh.get_grid_deltas_dominios(axis=0, orientation="w")
-        δ_x = δ_d_x_grid
-        gamma_w = self._gamma(faces_x[:-1], y , z) # Usando todas las de la izquierda (west)
-        areas = mesh.areas_x()
-        source = areas.copy()
-        areas[0,:,:] = 0
-        source[1:,:,:] = 0
-        west_d = gamma_w * areas / δ_x
-        # Aquí obtenemos Sp
-        sp = gamma_w * source / δ_x
-        condicion = mesh.get_mask_boundaries_Sp(direction="W")
-        sp[:1,:,:] = sp[:1,:,:]*np.array(condicion).reshape(sp[:1,:,:].shape)
-        
-        # Aquí obtenemos Su
-        conds_su = mesh.get_mask_boundaries_Su(direction="W", gamma = self._gamma)
-        su = source
-        su[:1,:,:] = su[:1,:,:]*np.array(conds_su).reshape(su[:1,:,:].shape)
-        div = δ_x[:1,:,:]*np.array(condicion).reshape(su[:1,:,:].shape)
-        div = np.where(div == 0., 1, div)
-        su[:1,:,:] = su[:1,:,:]/div
+        west_d, sp, su = self.get_diffusion_coef("W")
         return west_d, sp, su
 
     def north_diffusion(self):
@@ -104,29 +108,7 @@ class Diffusion():
         Gives a 3D numpy array that should be used to correct the aN coefficient
         caused by the diffusion effect.
         """
-        mesh = self._mesh
-        faces_y = mesh.faces[1]
-        x, y, z = np.meshgrid(mesh.coords[0], mesh.coords[1], mesh.coords[2])
-        δ_d_x_grid, δ_d_y_grid, δ_d_z_grid = mesh.get_grid_deltas_dominios(axis=1, orientation="n")
-        δ_y = δ_d_y_grid
-        gamma_n = self._gamma(x, faces_y[1:] , z) # Usando todas las de arriba (north)
-        areas = mesh.areas_y()
-        source = areas.copy()
-        areas[:,-1,:] = 0
-        source[:,:-1,:] = 0
-        north_d = gamma_n * areas / δ_y
-        # Aquí obtenemos Sp
-        sp = gamma_n * source / δ_y
-        condicion = mesh.get_mask_boundaries_Sp(direction="N")
-        sp[:,-1:,:] = sp[:,-1:,:]*np.array(condicion).reshape(sp[:,-1:,:].shape)
-        
-        # Aquí obtenemos Su
-        conds_su = mesh.get_mask_boundaries_Su(direction="N", gamma = self._gamma)
-        su = source
-        su[:,-1:,:] = su[:,-1:,:]*np.array(conds_su).reshape(su[:,-1:,:].shape)
-        div = δ_y[:,-1:,:]*np.array(condicion).reshape(su[:,-1:,:].shape)
-        div = np.where(div == 0., 1, div)
-        su[:,-1:,:] = su[:,-1:,:]/div
+        north_d, sp, su = self.get_diffusion_coef("N")
         return north_d, sp, su
 
     def south_diffusion(self):
@@ -134,29 +116,7 @@ class Diffusion():
         Gives a 3D numpy array that should be used to correct the aS coefficient
         caused by the diffusion effect.
         """
-        mesh = self._mesh
-        faces_y = mesh.faces[1]
-        x, y, z = np.meshgrid(mesh.coords[0], mesh.coords[1], mesh.coords[2])
-        δ_d_x_grid, δ_d_y_grid, δ_d_z_grid = mesh.get_grid_deltas_dominios(axis=1, orientation="s")
-        δ_y = δ_d_y_grid
-        gamma_s = self._gamma(x, faces_y[:-1] , z) # Usando todas las de abajo (south)
-        areas = mesh.areas_y()
-        source = areas.copy()
-        areas[:,0,:] = 0
-        source[:,1:,:] = 0
-        south_d = gamma_s * areas / δ_y
-        # Aquí obtenemos Sp
-        sp = gamma_s * source / δ_y
-        condicion = mesh.get_mask_boundaries_Sp(direction="S")
-        sp[:,:1,:] = sp[:,:1,:]*np.array(condicion).reshape(sp[:,:1,:].shape)
-        
-        # Aquí obtenemos Su
-        conds_su = mesh.get_mask_boundaries_Su(direction="S", gamma = self._gamma)
-        su = source
-        su[:,:1,:] = su[:,:1,:]*np.array(conds_su).reshape(su[:,:1,:].shape)
-        div = δ_y[:,:1,:]*np.array(condicion).reshape(su[:,:1,:].shape)
-        div = np.where(div == 0., 1, div)
-        su[:,:1,:] = su[:,:1,:]/div
+        south_d, sp, su = self.get_diffusion_coef("S")
         return south_d, sp, su
 
     def top_diffusion(self):
@@ -164,31 +124,7 @@ class Diffusion():
         Gives a 3D numpy array that should be used to correct the aT coefficient
         caused by the diffusion effect.
         """
-        mesh = self._mesh
-        faces_z = mesh.faces[2]
-        x, y, z = np.meshgrid(mesh.coords[0], mesh.coords[1], mesh.coords[2])
-        δ_d_x_grid, δ_d_y_grid, δ_d_z_grid = mesh.get_grid_deltas_dominios(axis=2, orientation="t")
-        δ_z = δ_d_z_grid
-        gamma_t = self._gamma(x, y , faces_z[1:]) # Usando todas las superiores (top)
-        areas = mesh.areas_z()
-        source = areas.copy()
-        areas[:,:,-1] = 0
-        source[:,:,:-1] = 0
-        top_d = gamma_t * areas / δ_z
-        # Aquí obtenemos Sp
-        sp = gamma_t * source / δ_z
-        condicion = mesh.get_mask_boundaries_Sp(direction="T")
-        sp[:,:,-1:] = sp[:,:,-1:]*np.array(condicion).reshape(sp[:,:,-1:].shape)
-        
-        # Aquí obtenemos Su
-        conds_su = mesh.get_mask_boundaries_Su(direction="T", gamma = self._gamma)
-        su = source
-        su[:,:,-1:] = su[:,:,-1:]*np.array(conds_su).reshape(su[:,:,-1:].shape)
-        print("Su_t:", su, su.shape)
-        print("δ_z_t", δ_z, δ_z.shape)
-        div = δ_z[:,:,-1:]*np.array(condicion).reshape(su[:,:,-1:].shape)
-        div = np.where(div == 0., 1, div)
-        su[:,:,-1:] = su[:,:,-1:]/div
+        top_d, sp, su = self.get_diffusion_coef("T")
         return top_d, sp, su
 
     def bottom_diffusion(self):
@@ -196,29 +132,5 @@ class Diffusion():
         Gives a 3D numpy array that should be used to correct the aB coefficient
         caused by the diffusion effect.
         """
-        mesh = self._mesh
-        faces_z = mesh.faces[2]
-        x, y, z = np.meshgrid(mesh.coords[0], mesh.coords[1], mesh.coords[2])
-        δ_d_x_grid, δ_d_y_grid, δ_d_z_grid = mesh.get_grid_deltas_dominios(axis=2, orientation="b")
-        δ_z = δ_d_z_grid
-        gamma_b = self._gamma(x, y, faces_z[:-1]) # Usando todas las inferiores (bottom)
-        areas = mesh.areas_z()
-        source = areas.copy()
-        areas[:,:,0] = 0
-        source[:,:,1:] = 0
-        bottom_d = gamma_b * areas / δ_z
-        # Aquí obtenemos Sp
-        sp = gamma_b * source / δ_z
-        condicion = mesh.get_mask_boundaries_Sp(direction="B")
-        sp[:,:,:1] = sp[:,:,:1]*np.array(condicion).reshape(sp[:,:,:1].shape)
-        
-        # Aquí obtenemos Su
-        conds_su = mesh.get_mask_boundaries_Su(direction="B", gamma = self._gamma)
-        su = source
-        su[:,:,:1] = su[:,:,:1]*np.array(conds_su).reshape(su[:,:,:1].shape)
-        print("Su_b:", su, su.shape)
-        print("δ_z_b", δ_z, δ_z.shape)
-        div = δ_z[:,:,:1]*np.array(condicion).reshape(su[:,:,:1].shape)
-        div = np.where(div == 0., 1, div)
-        su[:,:,:1] = su[:,:,:1]/div
+        bottom_d, sp, su = self.get_diffusion_coef("B")
         return bottom_d, sp, su
