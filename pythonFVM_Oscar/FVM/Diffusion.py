@@ -1,13 +1,4 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Apr  3 21:37:18 2019
-
-@author: jose
-"""
-
 import numpy as np
-#from Coefficients import Coefficients
 
 class Diffusion():
     """
@@ -69,14 +60,14 @@ class Diffusion():
 
         # Aquí obtenemos Sp
         sp = gamma * source / δ
-        condicion = mesh.get_mask_boundaries_Sp(direction)
+        condicion = self.get_mask_boundaries_Sp(mesh, direction)
         λ_3 = lambda d: slice(-1,None) if d in ["E","N","T"] else slice(None,1)
         coord_4 = [slice(None,None) if var!=idx else λ_3(direction) for var in range(3)]
         tmp_sp = sp[coord_4[0],coord_4[1],coord_4[2]]
         sp[coord_4[0],coord_4[1],coord_4[2]] = tmp_sp*np.array(condicion).reshape(tmp_sp.shape)
         
         # Aquí obtenemos Su
-        conds_su = mesh.get_mask_boundaries_Su(direction, gamma = self._gamma)
+        conds_su = self.get_mask_boundaries_Su(mesh, direction, gamma = self._gamma)
         su = source
         tmp_su = su[coord_4[0],coord_4[1],coord_4[2]]
         su[coord_4[0],coord_4[1],coord_4[2]] = tmp_su*np.array(conds_su).reshape(tmp_su.shape)
@@ -134,3 +125,29 @@ class Diffusion():
         """
         bottom_d, sp, su = self.get_diffusion_coef("B")
         return bottom_d, sp, su
+    
+    def get_mask_boundaries_Sp(self, malla, direction):
+        tags_fronteras = malla._Mesh__tags_fronteras
+        condicion = []
+        dict_cond = {"I":0, "N":0, "D":1}
+        for tag in tags_fronteras:
+            if list(tags_fronteras[tag]["frontera"].keys())[0] == direction:
+                cond = list(tags_fronteras[tag]["cond"].keys())[0]
+                condicion.append(dict_cond[cond])
+        return condicion
+    
+    def get_mask_boundaries_Su(self, malla, direction, gamma):
+        tags_fronteras = malla._Mesh__tags_fronteras
+        condicion = []
+        dict_cond = {"I":0, "N":0, "D":1}
+        for tag in tags_fronteras:
+            if list(tags_fronteras[tag]["frontera"].keys())[0] == direction:
+                cond = list(tags_fronteras[tag]["cond"].keys())[0]
+                if cond == "I":
+                    condicion.append(0)
+                elif cond == "N":
+                    condicion.append(tags_fronteras[tag]["cond"][cond])
+                elif cond == "D":
+                    x,y,z = tags_fronteras[tag]["coord"]
+                    condicion.append(tags_fronteras[tag]["cond"][cond]*gamma(x,y,z))
+        return condicion

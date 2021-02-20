@@ -403,29 +403,3 @@ class Mesh():
         the Z direction. The numpy array contains an area for each volume. 
         """  
         return self.get_area(direction=2)
-    
-    def get_mask_boundaries_Sp(self, direction):
-        tags_fronteras = self.__tags_fronteras
-        condicion = []
-        dict_cond = {"I":0, "N":0, "D":1}
-        for tag in tags_fronteras:
-            if list(tags_fronteras[tag]["frontera"].keys())[0] == direction:
-                cond = list(tags_fronteras[tag]["cond"].keys())[0]
-                condicion.append(dict_cond[cond])
-        return condicion
-    
-    def get_mask_boundaries_Su(self, direction, gamma):
-        tags_fronteras = self.__tags_fronteras
-        condicion = []
-        dict_cond = {"I":0, "N":0, "D":1}
-        for tag in tags_fronteras:
-            if list(tags_fronteras[tag]["frontera"].keys())[0] == direction:
-                cond = list(tags_fronteras[tag]["cond"].keys())[0]
-                if cond == "I":
-                    condicion.append(0)
-                elif cond == "N":
-                    condicion.append(tags_fronteras[tag]["cond"][cond])
-                elif cond == "D":
-                    x,y,z = tags_fronteras[tag]["coord"]
-                    condicion.append(tags_fronteras[tag]["cond"][cond]*gamma(x,y,z))
-        return condicion
