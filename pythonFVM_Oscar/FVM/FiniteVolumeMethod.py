@@ -8,4 +8,3 @@ from pandas import DataFrame
 from Mesh import Mesh #
 from Coefficients import Coefficients
 from EqSystem import EqSystem
-from SolPlotr import SolPlotr
