@@ -42,12 +42,6 @@ class Mesh():
 
         self.__tags = {} # El etiquetado de todos los nodos sin fronteras
         self.__tags_fronteras = {} # El etiquetado de las fronteras
-
-        self.__autoMesh = True      # Al parecer es una bandera para calcular la posición de los nodos atmte
-        self.__emptyCoord = True    # Nos dice si las coordenadas del dominio (self.coords_dom) están guardadas
-        self.__pressed = False      # No sé
-
-        self.__intWallNodes = None  # No sé
         
         self.dim = dim
         #---if a parameter is not a tuple, that parameter is transformed into a tuple
@@ -102,6 +96,32 @@ class Mesh():
     #    d_3 = self.volumes[2]*d_2 - self.volumes[0]*self.volumes[1]*(self.volumes[2] - 1)
     #    return d_3
     
+    def init_tags(self):
+        """
+        Método que etiqueta las caras adyacentes de cada volumen dependiendo de la geometría. Pone un {} 
+        (diccionario vacío) cuando es una frontera, una 'F' cuando es una cara interna y un 'Off' cuando 
+        no se está contando esa cara por las dimensiones del problema. 
+        """
+        self.__tags = {}
+        X, Y, Z = self.volumes
+        for z in range(1,Z+1):
+            for y in range(1,Y+1):
+                for x in range(1,X+1):                   
+                    t = b = n = s = "Off"
+                    e = w = "F"
+                    if x == 1: w = {}
+                    elif x == X: e = {}
+                    if self.dim > 1:
+                        n = s = "F"
+                        if y == 1: s = {}
+                        elif y == Y: n = {}
+                        if self.dim == 3:
+                            t = b = "F"
+                            if z == 1: b = {}
+                            elif z == Z: t = {}
+                    self.__tags[f"{x}-{y}-{z}"] = {"E": e, "W": w, "N": n, "S": s, "T": t, "B": b, 
+                                             "coord": [self.dominios[0][x], self.dominios[1][y], self.dominios[2][z]]}
+    
     def init_tags_fronteras(self):
         """
         Método para etiquetar las fronteras dependiendo de la dimensión, sólo se les da la propiedad de existir o no
@@ -130,44 +150,17 @@ class Mesh():
                                 elif z == (Z - 1): var = "T"; value = t
                                 else: continue
                             else: continue
-                            self.__tags_fronteras[f"{x}{y}{z}"] = {"frontera": {var: value},
+                            self.__tags_fronteras[f"{x}-{y}-{z}"] = {"frontera": {var: value},
                                                  "coord": [self.dominios[0][x], self.dominios[1][y], self.dominios[2][z]],
                                                                   "cond": {}} 
                         elif z != 0 and z != (Z - 1):
                             if x != 0 and x != (X - 1):
                                 if y == 0: var = "S"; value = s
                                 elif y == (Y - 1) : var = "N"; value = n
-                                self.__tags_fronteras[f"{x}{y}{z}"] = {"frontera": {var: value},
+                                self.__tags_fronteras[f"{x}-{y}-{z}"] = {"frontera": {var: value},
                                                  "coord": [self.dominios[0][x], self.dominios[1][y], self.dominios[2][z]],
                                                                       "cond": {}} 
                         else: continue
-    
-    def init_tags(self):
-        """
-        Método que etiqueta las caras adyacentes de cada volumen dependiendo de la geometría. Pone un 0 (cero) cuando es una 
-        frontera, una 'F' cuando es una cara interna y un 'Off' cuando no se está contando esa cara por las dimensiones del 
-        problema. 
-        """
-        self.__tags = {}
-        X, Y, Z = self.volumes
-        for z in range(1,Z+1):
-            for y in range(1,Y+1):
-                for x in range(1,X+1):                   
-                    t = b = n = s = "Off"
-                    e = w = "F"
-                    if x == 1: w = {}
-                    elif x == X: e = {}
-                    if self.dim > 1:
-                        n = s = "F"
-                        if y == 1: s = {}
-                        elif y == Y: n = {}
-                        if self.dim == 3:
-                            t = b = "F"
-                            if z == 1: b = {}
-                            elif z == Z: t = {}
-
-                    self.__tags[f"{x}{y}{z}"] = {"E": e, "W": w, "N": n, "S": s, "T": t, "B": b, 
-                                             "coord": [self.dominios[0][x], self.dominios[1][y], self.dominios[2][z]]}
             
     def tag_wall(self, direction, tag, value):
         """
@@ -254,9 +247,6 @@ class Mesh():
         """
         Método para definir el dominio de estudio dadas unas coordenadas en forma de tupla.
         """
-        
-        self.__autoMesh = False # La posición de los nodos no se calcula en automático
-        
         # Si 'dominio' no es tupla, transforma 'dominio' a la tupla unidimensional (dominio,)
         # Tendría que ser una tupla de tuplas/listas/arreglos para que sea válido.
         if not isinstance(dominio, (tuple, int, float)): # Creo que si es una lista o un arreglo, no funciona enteros o float
@@ -276,7 +266,7 @@ class Mesh():
                 self.faces = tuple(dominio[0]) + tuple(faces) + tuple(dominio[-1])
             else: # Suponemos aquí que nos está pasando una lista de listas (o tupla de tuplas)
                 for idx, face_1dim in enumerate(faces):
-                    faces[idx] = list(dominio[idx][0]) + tuple(face_1dim) + tuple(dominio[idx][-1])
+                    faces[idx] = (dominio[idx][0], ) + tuple(face_1dim) + (dominio[idx][-1], )
                 self.faces = faces
         else: 
             self.faces = [(self.dominios[idx][0],) + tuple((np.array(coords[:-1]) + np.array(coords[1:]))/2) \
@@ -381,25 +371,15 @@ class Mesh():
         areas_grid = np.meshgrid(arreglo[0], arreglo[1], arreglo[2], indexing='ij')
         
         return areas_grid[perpendicular[0]]*areas_grid[perpendicular[1]]
-
     
-    def areas_x(self):
-        """
-        Returns a 3-dimensional numpy array containing the areas of the faces in
-        the X direction. The numpy array contains an area for each volume. 
-        """
-        return self.get_area()
-
-    def areas_y(self):
-        """
-        Returns a 3-dimensional numpy array containing the areas of the faces in
-        the Y direction. The numpy array contains an area for each volume. 
-        """
-        return self.get_area(direction=1)
-
-    def areas_z(self):
-        """
-        Returns a 3-dimensional numpy array containing the areas of the faces in
-        the Z direction. The numpy array contains an area for each volume. 
-        """  
-        return self.get_area(direction=2)
+    def stag_def(self, direct=0, stag="b"):
+        """Gives the parameters needed for defining a staggered mesh via the 'setDominio()'
+        method. The staggering it's made in the X axis. """
+        strategy_stag = lambda x: [self.dominios[direct][0]]+list(x)[:-1]+[self.coords[direct][-1]] if stag=="b" \
+                                    else [self.coords[direct][0]]+list(x)[1:]+[self.dominios[direct][-1]]
+        stg = strategy_stag(self.faces[direct])
+        arreglo = [stg if idx==direct else self.dominios[idx] for idx in range(3)]
+        strategy_stag_faces = lambda x: self.coords[x][:-1] if stag=="b" else self.coords[x][1:]
+        stg_faces = strategy_stag_faces(direct)
+        arreglo2 = [stg_faces if idx==direct else self.coords[idx] for idx in range(3)]
+        return (arreglo[0], arreglo[1], arreglo[2]), (arreglo2[0], arreglo2[1], arreglo2[2])
