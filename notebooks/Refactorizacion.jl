@@ -251,9 +251,6 @@ end
 # ╔═╡ 43407e34-b7cb-4a4e-9892-59b39ee38af7
 #tag_wall(tags, tags_b, :T, 1670, :D)
 
-# ╔═╡ f5e04936-f01e-487e-831b-b518ddedf103
-md"---"
-
 # ╔═╡ c58ea7b0-daeb-4340-ba1f-cb297ab0ac77
 begin
 	mutable struct Mesh
@@ -357,12 +354,14 @@ end
 # ╔═╡ 93d57deb-f0c7-4df7-bd15-69e95add9d3c
 draw(mesh)
 
-# ╔═╡ 8274809e-0d6f-4a94-baac-802f804193ae
-length(keys(mesh.tags_boundaries))
+# ╔═╡ f5e04936-f01e-487e-831b-b518ddedf103
+md"---"
 
 # ╔═╡ 3b71ed0f-53fb-4382-bcfb-786dd85f0ad1
 begin
-	function get_grid_deltas_centers_and_boundaries(centers_and_boundaries::Array, centers::Array, axis::Int=1, orientation::Symbol=:E, reverse::Bool=false)
+	function get_grid_deltas_centers_and_boundaries(mesh::Mesh, axis::Int=1, orientation::Symbol=:E, reverse::Bool=false)
+		centers_and_boundaries = mesh.centers_and_boundaries
+		centers = mesh.centers
 		deltas_centers_and_boundaries = []
 		grid_deltas_centers_and_boundaries = []
 		for direction ∈ 1:3
@@ -373,54 +372,68 @@ begin
 					push!(deltas_centers_and_boundaries, centers[direction])
 				end
 			else
-				@show centers_and_boundaries[direction][2:end]
-				@show centers_and_boundaries[direction][1:end-1]
 				push!(deltas_centers_and_boundaries, 
 					centers_and_boundaries[direction][2:end] - centers_and_boundaries[direction][1:end-1])
 			end
 		end
-		@show deltas_centers_and_boundaries
-			
-		if orientation == :E || orientation == :S || orientation == :B
+		if orientation ∈ [:E, :S,:B]
 			if reverse
 				deltas_centers_and_boundaries[axis] = /
-				deltas_centers_and_boundaries[axis][:end-1]
+				deltas_centers_and_boundaries[axis][1:end-1]
 			else
 				deltas_centers_and_boundaries[axis] = deltas_centers_and_boundaries[axis][2:end]
 			end
-				
 		else
 			if reverse
 				deltas_centers_and_boundaries[axis] = deltas_centers_and_boundaries[axis][2:end]
 			else
-				deltas_centers_and_boundaries[axis] = deltas_centers_and_boundaries[axis][:end-1]
+				deltas_centers_and_boundaries[axis] = deltas_centers_and_boundaries[axis][1:end-1]
 			end
 		end	
+		
 		#--------------- Aquí falta ver lo del meshgrid------------------
 		grid_deltas_centers_and_boundaries = grid(deltas_centers_and_boundaries[1],
 			deltas_centers_and_boundaries[2], deltas_centers_and_boundaries[3])
 	end
 	
-	function get_grid_deltas_faces(centers_and_boundaries::Array, centers::Array, faces::Array, axis::Int=1)
+	function get_grid_deltas_faces(mesh::Mesh, axis::Int=1)
+		centers_and_boundaries = mesh.centers_and_boundaries
+		centers = mesh.centers
+		faces = mesh.faces
 		deltas_faces = []
 		for direction ∈ 1:3
 			if direction != axis
 				if length(centers_and_boundaries[direction]) == 3
-					push!(deltas_faces, [centers_and_boundaries[direction][2]])
+					push!(deltas_faces, centers_and_boundaries[direction][2])
 				else
 					push!(deltas_faces, centers[direction])
 				end
-
 			else
 				push!(deltas_faces, faces[direction][2:end] - faces[direction][1:end-1])
 			end
 		end
-		@show deltas_faces
 		#--------------- Aquí falta ver lo del meshgrid------------------
 		grid_deltas_faces = grid(deltas_faces[1], deltas_faces[2], deltas_faces[3])
 	end
 	
-	function get_area(mesh::Mesh, direction::Real, extended=false::Boolean)
+# 	function get_deltas_faces(mesh::Mesh)
+# 		faces = mesh.faces
+#         deltas_faces = []
+#         for direction ∈ 1:3
+# 			push!(deltas_faces, faces[direction][2:end] - faces[direction][1:end-1])
+# 		end
+# 	end
+            
+#     function get_grids(mesh::Mesh)
+#         deltas = mesh.deltas
+#         coords = mesh.coords
+#         faces = mesh.faces
+#         grid_deltas = grid(deltas[0], deltas[1], deltas[2])
+#         grid_coords = grid(coords[0], coords[1], coords[2])
+#         grid_faces = grid(faces[0], faces[1], faces[2])
+# 	end
+	
+	function get_area(mesh::Mesh, direction::Real, extended::Bool=false)
 		perpendicular = [i for i ∈ 1:3 if i != direction]
 		num_boundaries = mesh.volumes[direction]
 
@@ -429,150 +442,151 @@ begin
 			array = [idx ∈ perpendicular ? mesh.deltas_faces[idx] : ones(num_boundaries+1) for idx in 1:3]
 		end
 		#--------------- Aquí falta ver lo del meshgrid------------------
-		areas_grid = [array[1], array[2], array[3]]
+		areas_grid = grid(array[1], array[2], array[3])
 		return areas_grid[perpendicular[1]]*areas_grid[perpendicular[2]]
 	end
 end
 
 # ╔═╡ 23d190c8-4c51-4f05-b8a4-0573f10d8c11
-#get_grid_deltas_centers_and_boundaries(mesh.deltas_centers_and_boundaries, mesh.centers_and_boundaries, mesh.centers)
+begin
+	grid_centers_and_boundaries = get_grid_deltas_centers_and_boundaries(mesh)
+	grid_centers_and_boundaries[1,1,1]
+end
 
 # ╔═╡ 912c556a-4ffd-4e49-a35e-ac83c77c112a
-#get_grid_deltas_faces(mesh.centers_and_boundaries, mesh.centers, mesh.faces)
+begin
+	grid_deltas_faces = get_grid_deltas_faces(mesh)
+	grid_deltas_faces[1,1,1]
+end
 
 # ╔═╡ b5ed1976-b09a-4a60-83ce-2455d5d63755
 md"## Coeficientes"
 
 # ╔═╡ 299fb45f-0579-42a4-8e28-46f8b818ecc9
 begin
-	mutable struct Coefficients
+	mutable struct Coefficients_1d
 		mesh::Mesh
+		aP::Array{Float64, 3}
+		aW::Array{Float64, 3}
+		aE::Array{Float64, 3}
+		Su::Array{Float64, 3}
+		Sp_a::Array{Float64, 3}
+		Sp_d::Array{Float64, 3}
+		bW::Array{Float64, 3}
+		bE::Array{Float64, 3}
+		aWW::Array{Float64, 3}
+		aEE::Array{Float64, 3}
+	end
+	
+	mutable struct Coefficients_2d
+		mesh::Mesh
+		aP::Array{Float64, 3}
+		aW::Array{Float64, 3}
+		aE::Array{Float64, 3}
+		Su::Array{Float64, 3}
+		Sp_a::Array{Float64, 3}
+		Sp_d::Array{Float64, 3}
+		bW::Array{Float64, 3}
+		bE::Array{Float64, 3}
+		aWW::Array{Float64, 3}
+		aEE::Array{Float64, 3}
+		
+		aN::Array{Float64, 3}
+		aS::Array{Float64, 3}
+		bN::Array{Float64, 3}
+		bS::Array{Float64, 3}
+		aNN::Array{Float64, 3}
+		aSS::Array{Float64, 3}
+	end 
+	
+	mutable struct Coefficients_3d
+		mesh::Mesh
+		aP::Array{Float64, 3}
+		aW::Array{Float64, 3}
+		aE::Array{Float64, 3}
+		Su::Array{Float64, 3}
+		Sp_a::Array{Float64, 3}
+		Sp_d::Array{Float64, 3}
+		bW::Array{Float64, 3}
+		bE::Array{Float64, 3}
+		aWW::Array{Float64, 3}
+		aEE::Array{Float64 ,3}
+		
+		aN::Array{Float64, 3}
+		aS::Array{Float64, 3}
+		bN::Array{Float64, 3}
+		bS::Array{Float64, 3}
+		aNN::Array{Float64, 3}
+		aSS::Array{Float64, 3}
+		
+		aT::Array{Float64, 3}
+		aB::Array{Float64, 3}
+		bT::Array{Float64, 3}
+		bB::Array{Float64, 3}
+		aTT::Array{Float64, 3}
+		aBB::Array{Float64, 3}
 	end 
 end
 
 # ╔═╡ cadfb39c-3487-460b-972e-2af7d348bed9
-function init_coefficients(coeff::Coefficients)
-	dim = coeff.mesh.dim
-	mesh = coeff.mesh
-	vols = coeff.mesh.volumes
+function init_coefficients(mesh::Mesh)
+	dim = sum(mesh.volumes .!= 1)
+	vols = mesh.volumes
 
-	aP = zeros(vols)
-	aW = zeros(vols)
-	aE = zeros(vols)
-	Su = zeros(vols)
-	Sp_a = zeros(vols)
-	Sp_d = zeros(vols)
-	bW = zeros(vols) # Aquí la contribuciones de la serie de Taylor para la condición de frontera
-	bE = zeros(vols)
-	aWW = zeros(vols) # Aquí depositaremos lo de la advección a segundo orden
-	aEE = zeros(vols)
+	aP = zeros(vols[1], vols[2], vols[3])
+	aW = zeros(vols[1], vols[2], vols[3])
+	aE = zeros(vols[1], vols[2], vols[3])
+	Su = zeros(vols[1], vols[2], vols[3])
+	Sp_a = zeros(vols[1], vols[2], vols[3])
+	Sp_d = zeros(vols[1], vols[2], vols[3])
+	bW = zeros(vols[1], vols[2], vols[3]) # Aquí la contribuciones de la serie de Taylor para la condición de frontera
+	bE = zeros(vols[1], vols[2], vols[3])
+	aWW = zeros(vols[1], vols[2], vols[3]) # Aquí depositaremos lo de la advección a segundo orden
+	aEE = zeros(vols[1], vols[2], vols[3])
 
 	if dim > 1
-		aN = zeros(vols)
-		aS = zeros(vols)
-		bN = zeros(vols) 
-		bS = zeros(vols)
-		aNN = zeros(vols)
-		aSS = zeros(vols)
+		aN = zeros(vols[1], vols[2], vols[3])
+		aS = zeros(vols[1], vols[2], vols[3])
+		bN = zeros(vols[1], vols[2], vols[3])
+		bS = zeros(vols[1], vols[2], vols[3])
+		aNN = zeros(vols[1], vols[2], vols[3])
+		aSS = zeros(vols[1], vols[2], vols[3])
 	end
 	if dim == 3
-		aT = zeros(vols)
-		aB = zeros(vols)
-		bT = zeros(vols) 
-		bB = zeros(vols)
-		aTT = zeros(vols)
-		aBB = zeros(vols)
+		aT = zeros(vols[1], vols[2], vols[3])
+		aB = zeros(vols[1], vols[2], vols[3])
+		bT = zeros(vols[1], vols[2], vols[3])
+		bB = zeros(vols[1], vols[2], vols[3])
+		aTT = zeros(vols[1], vols[2], vols[3])
+		aBB = zeros(vols[1], vols[2], vols[3])
 	end
+	
+	@show dim
+	if dim == 1
+		coeff = Coefficients_1d(mesh, aP, aW, aE, Su, Sp_a, Sp_d, bW, bE, aWW, aEE)
+	elseif dim == 2
+		coeff = Coefficients_2d(mesh, aP, aW, aE, Su, Sp_a, Sp_d, bW, bE, aWW, aEE,
+		aN, aS, bN, bS, aNN, aSS)
+	else
+		coeff = Coefficients_3d(mesh, aP, aW, aE, Su, Sp_a, Sp_d, bW, bE, aWW, aEE,
+		aN, aS, bN, bS, aNN, aSS, aT, aB, bT, bB, aTT, aBB)
+	end
+	return coeff
 end
 
+# ╔═╡ 01098663-6154-408a-9a4a-aa3a79d638f0
+coeff = init_coefficients(mesh)
+
 # ╔═╡ 3d74fabd-a66c-46f8-8ae3-ecac28587efb
-begin
-	function get_Su(coeff::Coefficients)
-		coeff.Su
-	end
-	    
-	function get_Sp_d(coeff::Coefficients)
-	    coeff.Sp_d
-	end
-	
-	function get_Sp_a(coeff::Coefficients)
-	    coeff.Sp_a
-	end
-	
-	function get_aP(coeff::Coefficients)
-	    coeff.aP
-	end
-	
-	function get_aE(coeff::Coefficients)
-	    coeff.aE
-	end
-	
-	function get_aW(coeff::Coefficients)
-	    coeff.aW
-	end
-	
-	function get_aN(coeff::Coefficients)
-	    coeff.aN
-	end
-	
-	function get_aS(coeff::Coefficients)
-	    coeff.aS
-	end
-	
-	function get_aT(coeff::Coefficients)
-	    coeff.aT
-	end
-	
-	function get_aB(coeff::Coefficients)
-	    coeff.aB
-	end
-	
-	function get_bE(coeff::Coefficients)
-	    coeff.bE
-	end
-	
-	function get_bW(coeff::Coefficients)
-	    coeff.bW
-	end
-	
-	function get_bN(coeff::Coefficients)
-	    coeff.bN
-	end
-	
-	function get_bS(coeff::Coefficients)
-	    coeff.bS
-	end
-	
-	function get_bT(coeff::Coefficients)
-	    coeff.bT
-	end
-	
-	function get_bB(coeff::Coefficients)
-	    coeff.bB
-	end
-	
-	function add_source(coeff::Coefficients, source::Real)
-	    """
-	    
-	    """
-		#--------------- Aquí falta ver lo del meshgrid------------------
-	    x, y, z = [coeff.mesh.deltas_faces[1], coeff.mesh.deltas_faces[2],
-	                          coeff.mesh.deltas_faces[3]]
-	    coeff.vols = x*y*z
-	    # Si es una constante
-		coeff.Su += source*coeff.vols
-	end
-																		
-	function add_source(coeff::Coefficients, source)
-	    """
-	    
-	    """ 
-	    # Si es una función
-		# Aquí se hacen como coordenadas radiales
-		crds = sqrt(sum(array([c for c ∈ coeff.mesh.coords if len(c) > 1])^2, 
-							  axis = 0))
-		coeff.Su += source(crds).reshape(coeff.mesh.volumes)*coeff.vols
-	end
+function add_source(coeff, source::Real)
+	"""
+
+	"""
+	#--------------- Aquí falta ver lo del meshgrid------------------
+	x, y, z = grid(coeff.mesh.deltas_faces[1], coeff.mesh.deltas_faces[2],
+						  coeff.mesh.deltas_faces[3])
+	# Si es una constante
+	coeff.Su += source*(x*y*z)
 end
 
 # ╔═╡ 1415d40a-91bb-4c26-9d31-23ad698285dd
@@ -582,18 +596,209 @@ md"## Difusión"
 begin
 	mutable struct Diffusion
 		mesh::Mesh
+		coeff
+		Γ::Real
 	end 
+end
+
+# ╔═╡ d44135b0-7825-4742-8829-58e97736fc56
+function init_diffusion(mesh:Mesh, coeff, Γ::Real)
+	""" 
+
+	"""
+	
+	return Difussion(mesh, coeff, Γ)
+end
+
+# ╔═╡ 0f0e2768-83bc-45f3-9507-cd8d25209bab
+begin	
+	function get_diffusion_coef(diff::Diffusion, direction::Symbol=:E, stgy::Symbol=:b)
+		"""
+
+		"""
+		what_dimension, limit = 1,1
+		if direction ∈ [:E, :S, :B] limit=-1 end
+		if direction ∈ [:N, :S] what_dimension=2
+		else what_dimension = 3
+		end
+
+		get_basic_diffusion_coef(diff, direction, what_dimension, limit)
+	end
+
+	function get_basic_diffusion_coef(diff::Diffusion, direction::Symbol, what_dimension::Int, limit::Int)
+		mesh = diff.mesh
+		faces = mesh.faces[what_dimension]
+
+		#----------------- Aquí vamos de nuevo con lo de Meshgrid----------------
+		x, y, z = grid(mesh.centers[1], mesh.centers[2], mesh.centers[3])
+		δ_d_grid = get_grid_deltas_faces(mesh, axis=what_dimension, orientation=direction)
+		δ = δ_d_grid[what_dimension]
+		areas = get_area(mesh, direction=what_dimension)
+		boundary_area = copy(areas)
+
+		# Para obtener los coeficientes de las caras centrales
+		diff = get_interior_terms(diff, x, y, z, direction, faces, what_dimension, limit, areas, δ)
+
+		condition_mask, condition_mask_type = get_mask_boundaries(diff, direction)
+		# Aquí obtenemos Sp (que son las fuentes internas)
+		# Parece que estas siempre van. Es la contribución de la frontera que no va directamente relacionado
+		# con la condición de la frontera. En la matriz del libro, son los extremos de la diagonal principal.
+		bound_term_c, bound_term_f = get_boundary_terms(diff, direction, condition_mask, condition_mask_type, what_dimension, boundary_area, δ)
+		sp = bound_term_c # Esto porque sólo contribuye a volumen central y no a alguno que lo rodee.
+
+		# Aquí obtenemos Su (que son las condition_maskes de frontera)
+		# En la matriz del libro son los extremos de las diagonales que no son la principal.
+		su = get_boundary_condition_mask(diff, direction, Γ_bound, Γ_bound_next, condition_mask, what_dimension, limite, boundary_area, δ)
+		return diff, sp, su, bound_term_f
+	end
+
+	function get_interior_terms(diff::Diffusion, x, y, z, direction::Symbol, faces, what_dimension::Int, limite::Int, areas::Array, δ::Array)
+		λ(x, d) = d ∈ [:E,:S,:B] ? x[2:end] : x[:end-1]
+		coord = [i!=what_dimension ? var : λ(faces, direction) for (i, var) ∈ enumerate([x,y,z])]
+		#----------------- Aquí vamos de nuevo con lo de Meshgrid----------------
+		Γ = diff.Γ.*grid(coord[1], coord[2], coord[3])
+		coord_l = [var!=what_dimension ? (:) : 1:(length(Γ[var])-1) for var ∈ 1:3]
+		coord_r = [var!=what_dimension ? (:) : 2:length(Γ[var]) for var ∈ 1:3]
+
+		# Aquí se obtiene el promedio de las Γ's
+		Γ_mean = (Γ[coord_l[0], coord_l[1], coord_l[2]] + Γ[coord_r[0], coord_r[1], coord_r[2]])*0.5
+		Γ_bar = zeros(size(Γ))
+
+		λ_2(d) = d ∈ [:E,:S,:B] ? (1:length(Γ[d])-1) : 2:length(Γ[d])
+		coord_3 = [var!=what_dimension ? (:) : λ_2(direction) for var ∈ 1:3]
+		Γ_bar[coord_3[1],coord_3[2],coord_3[3]] = Γ_mean
+		diff_coef = Γ_bar .* areas ./ δ
+
+		diff.Γ = Γ
+		return diff_coef
+		
+	end
+
+	function get_boundary_terms(diff::Diffusion, direction::Symbol, condition_mask_type, what_dimension::Int, Γ::Array, boundary_area::Array, δ::Array)
+		mesh = diff.mesh
+		ba = copy(boundary_area)
+
+		λ_area(d) = d ∈ [:E,:S,:B] ? (1:length(ba[d])-1) : 2:length(ba[d])
+		coord_area = [var!=what_dimension ? (:) : λ_area(direction) for var ∈ 1:3]
+		ba[coord_area[0],coord_area[1],coord_area[2]] = 0
+
+		λ(d) = d in [:E,:S,:B] ? (length(Γ[d])-1:length(Γ[d])) : 1:2
+		coord = [var!=what_dimension ? (:) : λ(direction) for var ∈ 1:3]
+		Γ_bound = Γ[coord[0], coord[1], coord[2]]
+		λ_1(d) = d ∈ [:E,:S,:B] ? (length(Γ[d])-2:length(Γ[d])-1) : 2:3
+		coord_1 = [var!=what_dimension ? (:) : λ_1(direction) for var in 1:3]
+		Γ_bound_next = Γ[coord_1[0], coord_1[1], coord_1[2]]
+
+		coef_f, coef_c = get_boundary_coefs(Γ_bound, Γ_bound_next, condition_mask_type)
+
+		# Para esta parte habría que agregar las areas correspondientes a las diferentes caras
+		bound_term_f = coef_f.* ba ./ δ
+		bound_term_c = coef_c.* ba ./ δ
+
+		return bound_term_c, bound_term_f
+	end
+
+	function get_boundary_coefs(Γ_bound, Γ_bound_next, condition_mask_type)
+		initial_shape = size(Γ_bound)
+		Γ_bound_flatten = vcat(Γ_bound...)
+		Γ_bound_next_flatten = vcat(Γ_bound_next...)
+
+		coefs_f = []
+		coefs_c = []
+		for (idx, condition) ∈ enumerate(condition_mask_type)
+			if condition == :D
+				coef_c = (9Γ_bound_flatten[idx] - 3Γ_bound_next_flatten[idx])/2
+				push!(coefs_c, coef_c)
+				coef_f = (Γ_bound_flatten[idx] - Γ_bound_next_flatten[idx]/3)/2
+				push!(coefs_f, coef_f)
+			elseif condition == :N
+				coef_f = 0
+				push!(coefs_f, 0)
+				push!(coefs_c, 0)
+			else
+				# Aquí faltaría definir la condición de Robín con un ejemplo, pero en teoría 
+				# todo está en el libro
+				push!(coefs_f, 0)
+				push!(coefs_c, 0)
+			end
+		end
+		coefs_f = reshape(coefs_f, initial_shape)
+		coefs_c = reshape(coefs_c, initial_shape)
+
+		return coefs_f, coefs_c
+	end
+
+	function get_boundary_condition_mask(diff::Diffusion, direction::Symbol, Γ_bound::Array, Γ_bound_next::Array, condition_mask::Array, what_dimension::Int, limite::Int, boundary_area::Array, δ::Array)
+		
+		Γ_cond = (3Γ_bound - Γ_bound_next)/2
+		conds_su = get_mask_boundaries_Su(diff, direction, Γ, direction)
+		ba = copy(boundary_area)
+
+		λ_area(d) = d ∈ [:E,:S,:B] ? (1:length(ba[d])-1) : 2:length(ba[d])
+		coord_area = [var!=what_dimension ? (:) : λ_area(direction) for var in 1:3]
+		ba[coord_area[0],coord_area[1],coord_area[2]] = 0
+		su = ba
+
+		λ(d) = d ∈ [:E,:S,:B] ? (length(su[d])-1:length(su[d])) : 1:2
+		coord = [var!=what_dimension ? (:) : λ(direction) for var in 1:3]
+		tmp_su = su[coord[0],coord[1],coord[2]]
+		su[coord[0],coord[1],coord[2]] = tmp_su.*reshape(conds_su, size(tmp_su))
+		tmp_su = su[coord[0],coord[1],coord[2]]
+		div = δ[coord[0],coord[1],coord[2]].*reshape(condition_mask, size(tmp_su))
+		div[findall(==(0), div)] = 1
+		su[coord[0],coord[1],coord[2]] = tmp_su./div
+		return su
+	end
+
+		# Aquí creamos una máscara que nos dirá qué condición de frontera hay por cada coordenada.
+		#### Hay que cambiar dependiendo de qué pase con cada condición de frontera.
+	function get_mask_boundaries(diff::Diffusion, direction::Symbol)
+		mesh = diff.mesh
+		tags_boundaries = mesh.tags_boundaries
+		condition_mask = []
+		condition_mask_type = []
+		dict_cond = Dict(:I=>0, :N=>0, :D=>1)
+		for tag_b ∈ tags_boundaries
+			if collect(keys(tags_boundaries[tag_b]["frontera"]))[1] == direction
+				cond = collect(keys(tags_fronteras[tag_b]["cond"]))[1]
+				push!(condition_mask, dict_cond[cond])
+				push!(condition_mask_type, cond)
+			end
+		end
+		return condition_mask, condition_mask_type
+	end
+
+
+	function get_mask_boundaries_Su(diff::Diffusion, direction::Symbol, Γ::Array)
+		mesh = diff.mesh
+		tags_boundaries = mesh.tags_boundaries
+		condition_mask = []
+		counter = 0
+		for (idx, tag_b) ∈ enumerate(tags_boundaries)
+			if collect(keys(tags_boundaries[tag_b]["frontera"]))[1] == direction
+				cond = collect(keys(tags_fronteras[tag_b]["cond"]))[1]
+				if cond == :I
+					push!(condition_mask, 0)
+				elseif cond == :N
+					push!(condition_mask, tags_boundaries[tag_b]["cond"][cond])
+				elseif cond == :D
+					push!(condition_mask, vcat(Γ...)[counter].*(8tags_boundaries[tag_b]["cond"][cond]/3))
+				counter += 1
+				end
+			end
+		end
+		return condition_mask
+	end
 end
 
 # ╔═╡ 9cfffb8f-a061-4114-84d8-b376be3a5477
 begin
-	function set_diffusion(coeff::Coefficients, gamma, velocity_direction::String=None)
+	function set_diffusion(coeff, gamma, velocity_direction::Int=1)
 	    """
 	    
 	    """
-	    
-	    dim = coeff.mesh.dim
 	    mesh = coeff.mesh
+	    dim = sum(mesh.volumes .!= 1)
 	    diffusion = Diffusion(mesh, gamma)
 		
 	    west_diff, sp_w, su_w, bound_term_w = get_diffusion_coef(diffusion, :W)
@@ -646,14 +851,13 @@ begin
 	    """
 	    
 	    """
-	    
-	    dim = coeff.mesh.dim
 	    mesh = coeff.mesh
+	    dim = sum(mesh.volumes .!= 1)
 	    advection = Advection(mesh, rho, vel, scheme)
-	    west_c_adv, west_f1_adv, west_f2_adv, west_b1_adv, west_b2_adv, sp_w, su_w, bound_term_w = \
-	        get_advection_coef(advection, :W, stgy)
-	    east_c_adv, east_f1_adv, east_f2_adv, east_b1_adv, east_b2_adv, sp_e, su_e, bound_term_e = \
-	        get_advection_coef(advection, :E, stgy)
+	    west_c_adv, west_f1_adv, west_f2_adv, west_b1_adv, west_b2_adv, sp_w, su_w, bound_term_w = get_advection_coef(advection, :W, stgy)
+		
+	    east_c_adv, east_f1_adv, east_f2_adv, east_b1_adv, east_b2_adv, sp_e, su_e, bound_term_e = get_advection_coef(advection, :E, stgy)
+		
 	    coeff.aE += east_f1_adv
 	    coeff.aW -= west_b1_adv
 	    coeff.bW -= bound_term_w
@@ -665,10 +869,10 @@ begin
 	    coeff.aE += coeff.bE
 				
 	    if dim > 1
-	        north_c_adv, north_f1_adv, north_f2_adv, north_b1_adv, north_b2_adv, sp_n, su_n, bound_term_n = \
-	            advection.get_advection_coef(:N, staggered, velocity_direction, vel,pressure_mesh, stgy)
-	        south_c_adv, south_f1_adv, south_f2_adv, south_b1_adv, south_b2_adv, sp_s, su_s, bound_term_s = \
-	            advection.get_advection_coef(:S, staggered, velocity_direction, vel,pressure_mesh, stgy)
+	        north_c_adv, north_f1_adv, north_f2_adv, north_b1_adv, north_b2_adv, sp_n, su_n, bound_term_n = advection.get_advection_coef(:N, staggered, velocity_direction, vel,pressure_mesh, stgy)
+			
+	        south_c_adv, south_f1_adv, south_f2_adv, south_b1_adv, south_b2_adv, sp_s, su_s, bound_term_s = advection.get_advection_coef(:S, staggered, velocity_direction, vel,pressure_mesh, stgy)
+			
 	        coeff.aN += north_f1_adv
 	        coeff.aS -= south_b1_adv
 	        coeff.bN -= bound_term_n
@@ -680,10 +884,9 @@ begin
 	        coeff.aS += coeff.bS
 		end	
 	    if dim == 3
-	        top_c_adv, top_f1_adv, top_f2_adv, top_b1_adv, top_b2_adv, sp_t, su_t, bound_term_t = \
-	            get_advection_coef(advection, :T, stgy)
-	        bottom_c_adv, bottom_f1_adv, bottom_f2_adv, bottom_b1_adv, bottom_b2_adv, sp_b, su_b, bound_term_b = \
-	            get_advection_coef(advection, :B, stgy)
+	        top_c_adv, top_f1_adv, top_f2_adv, top_b1_adv, top_b2_adv, sp_t, su_t, bound_term_t = get_advection_coef(advection, :T, stgy)
+			
+	        bottom_c_adv, bottom_f1_adv, bottom_f2_adv, bottom_b1_adv, bottom_b2_adv, sp_b, su_b, bound_term_b = get_advection_coef(advection, :B, stgy)
 			
 	        coeff.aT += top_f1_adv
 	        coeff.aB -= bottom_b1_adv
@@ -698,243 +901,6 @@ begin
 		end
 	end 
 end
-
-# ╔═╡ d44135b0-7825-4742-8829-58e97736fc56
-function init_diffusion(diff::Diffusion, Γ::Real)
-	""" 
-
-	"""
-
-	diff.Γ = Γ
-end
-
-# ╔═╡ 0f0e2768-83bc-45f3-9507-cd8d25209bab
-function get_diffusion_coef(diff::Diffusion, direction::Char, stgy::Char='b')
-	"""
-
-	"""
-	what_dimension, limit = 1,1
-	if direction ∈ [:E, :S, :B] limit=-1 end
-	if direction ∈ [:N, :S] what_dimension=2
-	elseif direction ∈ [:T, :B] what_dimension = 3
-	end
-        
-	get_basic_diffusion_coef(diff, what_dimension, limit)
-end
-
-function get_basic_diffusion_coef(diff::Diffusion, what_dimension::Int, limit::Int):
-	direction = diff.direction
-	mesh = diff.mesh
-	faces = diff.mesh.faces[what_dimension]
-
-	#----------------- Aquí vamos de nuevo con lo de Meshgrid----------------
-	x, y, z = [mesh.coords[1], mesh.coords[2], mesh.coords[3]]
-	δ_d_grid = mesh.get_grid_deltas_faces(axis=what_dimension, orientation=direction)
-	δ = δ_d_grid[what_dimension]
-	areas = get_area(diff.mesh, direction=what_dimension)
-	boundary_area = copy(areas)
-
-	# Para obtener los coeficientes de las caras centrales
-	diff = get_interior_terms(diff, x, y, z, direction, faces, what_dimension, limit, areas, δ)
-
-	diff.condition_mask, diff.condition_mask_type = get_mask_boundaries(diff)
-	# Aquí obtenemos Sp (que son las fuentes internas)
-	# Parece que estas siempre van. Es la contribución de la frontera que no va directamente relacionado
-	# con la condición de la frontera. En la matriz del libro, son los extremos de la diagonal principal.
-	bound_term_c, bound_term_f = get_boundary_terms(diff, what_dimension, boundary_area, δ)
-	sp = bound_term_c # Esto porque sólo contribuye a volumen central y no a alguno que lo rodee.
-
-	# Aquí obtenemos Su (que son las condition_maskes de frontera)
-	# En la matriz del libro son los extremos de las diagonales que no son la principal.
-	su = get_boundary_condition_mask(diff, what_dimension, limite, boundary_area, δ)
-	return diff, sp, su, bound_term_f
-end
-    
-function get_interior_terms(diff::Diffusion, x, y, z, direction, faces, what_dimension, limite, areas, δ):
-	λ(x, d) = x[2:end] if d ∈ [:E,:S,:B] else x[:end-1]
-	coord = [i!=what_dimension ? var : λ(faces, direction) for (i, var) ∈ enumerate([x,y,z])]
-	#----------------- Aquí vamos de nuevo con lo de Meshgrid----------------
-	#=
-	Γ = diff.Γ(coord[1], coord[2], coord[3])
-	coord_l = [(:) if var!=what_dimension else 1:length(Γ[var])-1 for var ∈ 1:3]
-	coord_r = [(:) if var!=what_dimension else 2:length(Γ[var]) for var ∈ 1:3]
-		
-	# Aquí se obtiene el promedio de las Γ's
-	Γ_mean = (Γ[coord_l[0], coord_l[1], coord_l[2]] + Γ[coord_r[0], coord_r[1], coord_r[2]])*0.5
-	Γ_bar = zeros(Γ.shape)
-	=#
-
-	λ_2(d) = d in [:E,:S,:B] ? slice(None,-1) : slice(1,None)
-	coord_3 = [var!=what_dimension ? slice(None,None) : λ_2(direction) for var in 1:3]
-	Γ_bar[coord_3[1],coord_3[2],coord_3[3]] = Γ_mean
-	diff_coef = Γ_bar * areas / δ
-
-	diff.Γ = Γ
-	return diff_coef
-    
-function get_boundary_terms(diff::Diffusion, what_dimension, Γ, boundary_area, δ, stag = False):
-	mesh = diff.mesh
-	direction = diff.direction
-	condition_mask = diff.condition_mask
-	condition_mask_type = diff.condition_mask_type
-	ba = copy(boundary_area)
-
-	λ_area(d) = d in [:E,:S,:B] ? slice(None,-1) : slice(1,None)
-	coord_area = [var!=what_dimension ? slice(None,None) : λ_area(direction) for var in range(3)]
-	ba[coord_area[0],coord_area[1],coord_area[2]] = 0
-
-	λ = lambda d: slice(-1,None) if d in ["E","S","B"] else slice(None,1)
-	coord = [slice(None,None) if var!=what_dimension else λ(direction) for var in range(3)]
-	Γ_bound = Γ[coord[0], coord[1], coord[2]]
-	λ_1 = lambda d: slice(-2,-1) if d in ["E","S","B"] else slice(1,2)
-	coord_1 = [slice(None,None) if var!=what_dimension else λ_1(direction) for var in range(3)]
-	Γ_bound_next = Γ[coord_1[0], coord_1[1], coord_1[2]]
-	if stag:
-		coef_f, coef_c = self.get_boundary_coefs_staggered(Γ_bound, Γ_bound_next, condition_mask_type)
-	else:
-		coef_f, coef_c = self.get_boundary_coefs(Γ_bound, Γ_bound_next, condition_mask_type)
-
-	# Para esta parte habría que agregar las areas correspondientes a las diferentes caras
-	bound_term_f = (coef_f)* ba / δ
-	bound_term_c = (coef_c)* ba / δ
-
-	self.Γ_bound = Γ_bound
-	self.Γ_bound_next = Γ_bound_next
-
-	return bound_term_c, bound_term_f
-    
-function get_boundary_coefs(self, Γ_bound, Γ_bound_next, condition_mask_type):
-	initial_shape = Γ_bound.shape
-	Γ_bound_flatten = np.ravel(Γ_bound)
-	Γ_bound_next_flatten = np.ravel(Γ_bound_next)
-
-	coefs_f = []
-	coefs_c = []
-	for idx, condition in enumerate(condition_mask_type):
-		if condition == "D":
-			coef_c = (9*Γ_bound_flatten[idx] - 3*Γ_bound_next_flatten[idx])/2
-			coefs_c.append(coef_c)
-			coef_f = (Γ_bound_flatten[idx] - Γ_bound_next_flatten[idx]/3)/2
-			coefs_f.append(coef_f)
-		if condition == "N":
-			coef_f = 0
-			coefs_f.append(0)
-			coefs_c.append(0)
-		if condition == "R" or condition == "I":
-			# Aquí faltaría definir la condición de Robín con un ejemplo, pero en teoría 
-			# todo está en el libro
-			coefs_f.append(0)
-			coefs_c.append(0)
-	coefs_f = np.array(coefs_f).reshape(initial_shape)
-	coefs_c = np.array(coefs_c).reshape(initial_shape)
-
-	return coefs_f, coefs_c
-        
-function get_boundary_coefs_staggered(self, Γ_bound, Γ_bound_next, condition_mask_type):
-	initial_shape = Γ_bound.shape
-	Γ_bound_flatten = np.ravel(Γ_bound)
-	Γ_bound_next_flatten = np.ravel(Γ_bound_next)
-	direction = self.direction
-	mesh = self._mesh
-
-
-	coefs_f = []
-	coefs_c = []
-	for idx, condition in enumerate(condition_mask_type):
-		if condition == "D":
-			coef_c = (9*Γ_bound_flatten[idx] - 3*Γ_bound_next_flatten[idx])/2
-			coefs_c.append(coef_c)
-			coef_f = (Γ_bound_flatten[idx] - Γ_bound_next_flatten[idx]/3)/2
-			coefs_f.append(coef_f)
-		if condition == "N":
-			coef_f = 0
-			coefs_f.append(0)
-			coefs_c.append(0)
-		if condition == "R" or condition == "I":
-			# Aquí faltaría definir la condición de Robín con un ejemplo, pero en teoría todo 
-			# está en el libro
-			coefs_f.append(0)
-			coefs_c.append(0)  
-	# A continuación multiplicamos los valores de la velocidad que ya sabemos de las 
-	# condiciones de la frontera
-	tags_fronteras = mesh._Mesh__tags_fronteras
-	condition_mask = []
-	counter = 0
-	for tag in tags_fronteras:
-		if list(tags_fronteras[tag]["frontera"].keys())[0] == direction:
-			cond = list(tags_fronteras[tag]["cond"].keys())[0]
-			if cond == "I":
-				condition_mask.append(0)
-			elif cond == "N":
-				# Aquí no es necesariamente 0, pero habría que hacer toda la transformación 
-				# como viene en el libro
-				condition_mask.append(0)
-			elif cond == "D":
-				condition_mask.append((tags_fronteras[tag]["cond"][cond]))
-			counter += 1
-
-	coefs_f = np.array(condition_mask).reshape(initial_shape)
-	coefs_c = np.array(coefs_c).reshape(initial_shape)
-
-	return coefs_f, coefs_c
-    
-function get_boundary_condition_mask(self, what_dimension, limite, boundary_area, δ):
-	direction = self.direction
-	Γ_bound = self.Γ_bound
-	Γ_bound_next = self.Γ_bound_next
-	condition_mask = self.condition_mask
-	condition_mask_type = self.condition_mask_type
-	Γ_cond = (3*Γ_bound - Γ_bound_next)/2
-	conds_su = self.get_mask_boundaries_Su(Γ_cond)
-	ba = boundary_area.copy()
-
-	λ_area = lambda d: slice(None,-1) if d in ["E","S","B"] else slice(1,None)
-	coord_area = [slice(None,None) if var!=what_dimension else λ_area(direction) for var in range(3)]
-	ba[coord_area[0],coord_area[1],coord_area[2]] = 0
-	su = ba
-
-	λ = lambda d: slice(-1,None) if d in ["E","S","B"] else slice(None,1)
-	coord = [slice(None,None) if var!=what_dimension else λ(direction) for var in range(3)]
-	tmp_su = su[coord[0],coord[1],coord[2]]
-	su[coord[0],coord[1],coord[2]] = tmp_su*np.array(conds_su).reshape(tmp_su.shape)
-	tmp_su = su[coord[0],coord[1],coord[2]]
-	div = δ[coord[0],coord[1],coord[2]]*np.array(condition_mask).reshape(tmp_su.shape)
-	div = np.where(div == 0., 1, div)
-	su[coord[0],coord[1],coord[2]] = tmp_su/div
-	return su
-    
-    # Aquí creamos una máscara que nos dirá qué condición de frontera hay por cada coordenada.
-    #### Hay que cambiar dependiendo de qué pase con cada condición de frontera.
-function get_mask_boundaries(self, malla):
-	direction = self.direction
-	tags_fronteras = malla._Mesh__tags_fronteras
-	condition_mask = []
-	condition_mask_type = []
-	dict_cond = {"I":0, "N":0, "D":1}
-	for tag in tags_fronteras:
-		if list(tags_fronteras[tag]["frontera"].keys())[0] == direction:
-			cond = list(tags_fronteras[tag]["cond"].keys())[0]
-			condition_mask.append(dict_cond[cond])
-			condition_mask_type.append(cond)
-	return condition_mask, condition_mask_type
-    
-function get_mask_boundaries_Su(self, Γ):
-	mesh = self._mesh
-	direction = self.direction
-	tags_fronteras = mesh._Mesh__tags_fronteras
-	condition_mask = []
-	counter = 0
-	for idx, tag in enumerate(tags_fronteras):
-		if list(tags_fronteras[tag]["frontera"].keys())[0] == direction:
-			cond = list(tags_fronteras[tag]["cond"].keys())[0]
-			if cond == "I":
-				condition_mask.append(0)
-			elif cond == "N":
-				condition_mask.append(tags_fronteras[tag]["cond"][cond])
-			elif cond == "D":
-				condition_mask.append(np.ravel(Γ)[counter]*(8*tags_fronteras[tag]["cond"][cond]/3))
-			counter += 1
-	return condition_mask
 
 # ╔═╡ aaa69ed2-d5ad-4bc8-825f-1e65b4d36da2
 md"## Advección"
@@ -956,7 +922,7 @@ md"## Ecuación de Poisson 3D"
 # ╟─a5c6a6a8-317a-11ec-25bc-7d7e08c53eb4
 # ╟─c2edc6c3-dbcc-4050-8992-e160bd9ebabb
 # ╟─226a6ac4-3f23-454a-9d7c-737cc316e11c
-# ╟─6eb2ab18-da3f-4433-85f1-ead20aa2fb80
+# ╠═6eb2ab18-da3f-4433-85f1-ead20aa2fb80
 # ╠═2b833859-dd6a-4dc6-9640-b206cd254413
 # ╠═ca72c120-e0b0-4bdc-8641-1d65aa1fdd9f
 # ╠═ed1a1dbd-6aab-48b3-9a06-354cd6adc77e
@@ -969,19 +935,19 @@ md"## Ecuación de Poisson 3D"
 # ╠═fb79c628-780e-40ed-bc3f-9670264bfa3b
 # ╠═4d43abf5-2b9a-4f4e-a060-d2cc7bbf72a9
 # ╠═43407e34-b7cb-4a4e-9892-59b39ee38af7
-# ╟─f5e04936-f01e-487e-831b-b518ddedf103
 # ╠═c58ea7b0-daeb-4340-ba1f-cb297ab0ac77
 # ╠═34bf980d-eebf-4767-907f-df1be41d7da0
 # ╠═feeda8d2-7aef-46fc-94b3-eb5882c0cfb3
 # ╠═2bff23a2-ffe8-4288-b473-74ba8d023763
 # ╠═93d57deb-f0c7-4df7-bd15-69e95add9d3c
-# ╠═8274809e-0d6f-4a94-baac-802f804193ae
+# ╟─f5e04936-f01e-487e-831b-b518ddedf103
 # ╠═3b71ed0f-53fb-4382-bcfb-786dd85f0ad1
 # ╠═23d190c8-4c51-4f05-b8a4-0573f10d8c11
 # ╠═912c556a-4ffd-4e49-a35e-ac83c77c112a
 # ╟─b5ed1976-b09a-4a60-83ce-2455d5d63755
 # ╠═299fb45f-0579-42a4-8e28-46f8b818ecc9
 # ╠═cadfb39c-3487-460b-972e-2af7d348bed9
+# ╠═01098663-6154-408a-9a4a-aa3a79d638f0
 # ╠═9cfffb8f-a061-4114-84d8-b376be3a5477
 # ╠═3d74fabd-a66c-46f8-8ae3-ecac28587efb
 # ╟─1415d40a-91bb-4c26-9d31-23ad698285dd
