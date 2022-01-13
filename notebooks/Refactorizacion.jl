@@ -6,6 +6,7 @@ using InteractiveUtils
 
 # ╔═╡ a5c6a6a8-317a-11ec-25bc-7d7e08c53eb4
 begin
+	using LinearAlgebra, SparseArrays
 	using PlutoUI
 	PlutoUI.TableOfContents(aside=true, title="🎣 Método del Volumen Finito 🔥")
 end
@@ -43,19 +44,12 @@ begin
 	end
 
 	function get_grids(deltas::Array, centers::Array, faces::Array)
-		#--------------- Aquí falta ver lo del meshgrid------------------
 		grid_deltas = grid(deltas[1], deltas[2], deltas[3])
 		grid_coords = grid(centers[1], centers[2], centers[3])
 		grid_faces = grid(faces[1], faces[2], faces[3])
 		return grid_deltas, grid_coords, grid_faces
 	end
 end	
-
-# ╔═╡ ca72c120-e0b0-4bdc-8641-1d65aa1fdd9f
-# set_volumes_and_lengths(5,5)
-
-# ╔═╡ 7b0d3a85-1eab-4726-a6f1-7b2a782a804d
-#set_volumes_and_lengths([5,4],[5,4])
 
 # ╔═╡ b59b0526-5e2a-478f-a16d-4de6572bab5e
 function uniform_grid(volume::Real, len::Real)
@@ -84,9 +78,6 @@ function uniform_grid(volume::Real, len::Real)
 	
  	return volumes, lengths, centers, centers_and_boundaries, deltas, faces, deltas_faces
 end
-
-# ╔═╡ 8f8169ae-214f-4d2a-8fef-0ba170dcefdf
-#uniform_grid(5, 5)
 
 # ╔═╡ 314ec1b1-d930-4f95-b31d-474bd7c8a357
 function init_tags(dim::Int, volumes::Array, centers_and_boundaries::Array)
@@ -117,9 +108,6 @@ function init_tags(dim::Int, volumes::Array, centers_and_boundaries::Array)
 	end
 	return tags
 end
-
-# ╔═╡ f701a90a-1814-4398-a910-7940efdec556
-#init_tags(3, unif_grid.volumes, unif_grid.centers_and_boundaries)
 
 # ╔═╡ eb9f3443-0032-41ca-8a55-9a38d8a2e3a9
 function init_tags_boundaries(dim::Int, centers_and_boundaries::Array)
@@ -171,9 +159,6 @@ function init_tags_boundaries(dim::Int, centers_and_boundaries::Array)
 	end
 	return tags_boundaries
 end
-
-# ╔═╡ fb79c628-780e-40ed-bc3f-9670264bfa3b
-#init_tags_boundaries(3, unif_grid.centers_and_boundaries)
 
 # ╔═╡ 4d43abf5-2b9a-4f4e-a060-d2cc7bbf72a9
 begin
@@ -246,9 +231,6 @@ begin
 		return tags, tags_boundaries
 	end
 end
-
-# ╔═╡ 43407e34-b7cb-4a4e-9892-59b39ee38af7
-#tag_wall(tags, tags_b, :T, 1670, :D)
 
 # ╔═╡ c58ea7b0-daeb-4340-ba1f-cb297ab0ac77
 begin
@@ -336,9 +318,6 @@ function draw(mesh)
  	Plots.scatter!(coord[1], coord[2], coord[3], color = :blue, markersize = 3)
 end
 
-# ╔═╡ f5e04936-f01e-487e-831b-b518ddedf103
-md"---"
-
 # ╔═╡ 3b71ed0f-53fb-4382-bcfb-786dd85f0ad1
 begin
 	function get_grid_deltas_centers_and_boundaries(mesh::Mesh, axis::Int=1, orientation::Symbol=:E, reverse::Bool=false)
@@ -392,18 +371,6 @@ begin
 		return array
 	end
 end
-
-# ╔═╡ 23d190c8-4c51-4f05-b8a4-0573f10d8c11
-# begin
-# 	grid_centers_and_boundaries = get_grid_deltas_centers_and_boundaries(mesh)
-# 	grid_centers_and_boundaries[1,1,1]
-# end
-
-# ╔═╡ 912c556a-4ffd-4e49-a35e-ac83c77c112a
-# begin
-# 	grid_deltas_faces = get_deltas_faces_by_axis(mesh)
-# 	grid_deltas_faces
-# end
 
 # ╔═╡ b5ed1976-b09a-4a60-83ce-2455d5d63755
 md"## Coeficientes"
@@ -524,7 +491,6 @@ function add_source(coeff, source::Real)
 	"""
 
 	"""
-	#--------------- Aquí falta ver lo del meshgrid------------------
 	x, y, z = grid(coeff.mesh.deltas_faces[1], coeff.mesh.deltas_faces[2],
 						  coeff.mesh.deltas_faces[3])
 	# Si es una constante
@@ -670,7 +636,6 @@ begin
 	end
 	
 	# Aquí creamos una máscara que nos dirá qué condición de frontera hay por cada coordenada.
-	#### Hay que cambiar dependiendo de qué pase con cada condición de frontera.
 	function get_mask_boundaries(coeff, direction::Symbol)
 		mesh = coeff.mesh
 		tags_boundaries = mesh.tags_boundaries
@@ -690,12 +655,10 @@ begin
 	function get_boundary_terms(diff, Γ::Array, direction::Symbol,
 			condition_mask_type, what_dimension::Int,
 			array_before_boundary_area::Array, δ::Array)
-		#mesh = diff.coeff.mesh
 		ba = [copy(array) for array ∈ array_before_boundary_area]
 
 		λ_area(d, idx) = d ∈ [:E,:S,:B] ? (length(ba[idx]):length(ba[idx])) : (1:1)
 		coord_area = [idx!=what_dimension ? (:) : λ_area(direction, idx) for idx ∈ 1:3]
-		#[ba[idx][coord] .= 0 for (idx, coord) ∈ enumerate(coord_area)]
 		ba = [ba[idx][coord_area[idx]] for idx in 1:3]
 
 		λ(d, idx) = d in [:E,:S,:B] ? (length(Γ[idx]):length(Γ[idx])) : (1:1)
@@ -868,12 +831,6 @@ function set_diffusion(coeff, Γ)
 	coeff.aE += coeff.bW 
 	coeff.aW += coeff.bE
 	
-	@show coeff.aW
-	@show coeff.aE
-	@show coeff.Sp_d
-	@show coeff.Su
-	@show coeff.aP
-	
 	if dim > 1
 		north_diff, sp_n, su_n, bound_term_n = get_diffusion_coef(diffusion, :N)
 		south_diff, sp_s, su_s, bound_term_s = get_diffusion_coef(diffusion,  :S)
@@ -906,12 +863,28 @@ function set_diffusion(coeff, Γ)
 	end
 end
 
-# ╔═╡ c0728e21-240f-4f38-98b7-caa943842afb
+# ╔═╡ f5e04936-f01e-487e-831b-b518ddedf103
+md"---"
+
+# ╔═╡ 3f1cd4d3-9052-4271-9e4e-8965c4e99170
+md"## Sistema de ecuaciones"
+
+# ╔═╡ c03ddaea-977f-4c3c-9d7e-52054850507b
 begin
-	volumes, lengths, centers, centers_and_boundaries, deltas, faces, deltas_faces = uniform_grid(5, 0.5)
+	mutable struct EqSystem
+		A::Array
+		b::Vector
+	end
+end
+
+# ╔═╡ a934ecd4-5d4c-4764-a518-0fb01aeee45d
+md"## Ecuación de Poisson 3D"
+
+# ╔═╡ 3e0e018b-a006-45f4-8d7b-e58f944cc972
+begin
+	volumes, lengths, centers, centers_and_boundaries, deltas, faces, deltas_faces = uniform_grid(8, 0.8)
 		
 	tags = init_tags(3, volumes, centers_and_boundaries)
-	
 	tags_b = init_tags_boundaries(3, centers_and_boundaries)
 	
 	tag_wall(tags, tags_b, [:W, :E, :T, :N, :B], 0, :D)
@@ -920,100 +893,127 @@ begin
 	mesh = Mesh(volumes, lengths, centers, centers_and_boundaries, deltas, faces, deltas_faces, tags, tags_b)
 	
 	coeff = init_coefficients(mesh)
-	
 	set_diffusion(coeff, Γ_constant)
-	
-	coeff
 end
 
-# ╔═╡ 3f1cd4d3-9052-4271-9e4e-8965c4e99170
-md"## Sistema de ecuaciones"
-
 # ╔═╡ 35fb94be-3647-4156-b82e-b54baa167fba
-def __init__(self, coef):
-        self.vols = coef.vols
-        self.coef = coef
-        self.aP = coef.aP
-        self.aE, self.aW = coef.aE, coef.aW
-        if coef.dim > 1: self.aN, self.aS = coef.aN, coef.aS
-        if coef.dim == 3: self.aT, self.aB = coef.aT, coef.aB
-        self.Su = coef.Su
-        self.N = self.aP.shape[0]*self.aP.shape[1]*self.aP.shape[2]
-        self.A, self.b = None, None
+begin
+	function init_eq_system(coeff)
+		mesh = coeff.mesh
+		volumes = mesh.volumes
+		dim = sum(volumes .!= 1)
+        aP = coeff.aP
+        aE, aW = coeff.aE, coeff.aW
+		if dim == 1
+			A = get_matrix_A(aP, aW, aE)
+		elseif dim > 1
+			aN, aS = coeff.aN, coeff.aS
+			if dim == 2
+				A = get_matrix_A(aP, aW, aE, aN, aS)
+			elseif dim == 3	
+				aT, aB = coeff.aT, coeff.aB
+				A = get_matrix_A(aP, aW, aE, aN, aS, aT, aB)
+			end 
+		end
         
-    def get_diag(self, array, k=0):
-        """
-        Método para construir una matriz diagonal dado un arreglo 2D y la diagonal en que queremos 
-        poner ese arreglo
-        """
-        if self.N > 50:
-            return diags(array, k)
-        else:
-            return np.diag(array,k)
+        Su = coeff.Su
+		b = get_vector_b(Su)
+		
+		eq_system = EqSystem(A, b)
+	end
         
         
-    def get_A_matrix(self):
+    function get_matrix_A(aP::Array, aW::Array, aE::Array)
         """
         Método para construir la matriz A, de la ecuación Ax=b, a partir de los coeficientes obtenidos.
         """
-        aP = np.ravel(self.aP)
-        self.A = self.get_diag(aP)
-        if self.coef.dim == 1:
-            aW = np.ravel(self.aW)[1:]
-            aE = np.ravel(self.aE)[:-1]
-            self.A += self.get_diag(aE, k=1) + self.get_diag(aW, k=-1)
-            
-        elif self.coef.dim == 2:
-            aN = np.ravel(self.aN)[1:]
-            aS = np.ravel(self.aS)[:-1]
-            aW = np.ravel(self.aW)[self.vols[1]:]
-            aE = np.ravel(self.aE)[:-self.vols[1]]
-            self.A += self.get_diag(aN, k=-1) + self.get_diag(aS, k=1) + \
-                        self.get_diag(aE, k=self.vols[1]) + self.get_diag(aW, k=-self.vols[1])
-            
-        # Esta parte está por verse, hay que encontrar un ejemplo chido en 3D
-        elif self.coef.dim == 3:
-            aT = np.ravel(self.aT)[1:]
-            aB = np.ravel(self.aB)[:-1]
-            aN = np.ravel(self.aN)[self.vols[1]:]
-            aS = np.ravel(self.aS)[:-self.vols[1]]
-            aW = np.ravel(self.aW)[self.vols[1]*self.vols[2]:]
-            aE = np.ravel(self.aE)[:-self.vols[1]*self.vols[2]]
-            self.A += self.get_diag(aT, k=-1) + self.get_diag(aB, k=1) + \
-                        self.get_diag(aN, k=-self.vols[1]) + \
-                        self.get_diag(aS, k=self.vols[1]) + \
-                        self.get_diag(aW, k=-self.vols[1]*self.vols[2]) +\
-                        self.get_diag(aE, k=self.vols[1]*self.vols[2])
-        return self.A
+        aP = [(aP...)...]
+        A = get_diag(aP)
+		aW = [(aW...)...][2:end]
+		aE = [(aE...)...][1:(end-1)]
+		A += get_diag(aE, 1) + get_diag(aW, -1)
+		return A
+	end
+		
+	function get_matrix_A(aP::Array, aW::Array, aE::Array, aN::Array, aS::Array)
+		aP = [(aP...)...]
+        A = get_diag(aP)
+		aN = [(aN...)...][2:end]
+		aS = [(aS...)...][1:(end-1)]
+		aW = [(aW...)...][volumes[2]:end]
+		aE = [(aE...)...][1:(end-volumes[2])]
+		A += get_diag(aN, -1) + get_diag(aS, 1) + get_diag(aE, volumes[2]) + get_diag(aW, -volumes[2])
+		return A
+	end
+
+	function get_matrix_A(aP::Array, aW::Array, aE::Array, aN::Array, aS::Array,
+			aT::Array, aB::Array)
+		aP = [(aP...)...]
+        A = get_diag(aP)
+		aT = [(aT...)...][2:end]
+		aB = [(aB...)...][1:(end-1)]
+		
+		aN = [(aN...)...][(volumes[2]+1):end]
+		aS = [(aS...)...][1:(end-volumes[2])]
+		
+		aW = [(aW...)...][((volumes[2]*volumes[3])+1):end]
+		aE = [(aE...)...][1:(end-volumes[2]*volumes[3])]
+		A += get_diag(aT, -1) + get_diag(aB, 1) + get_diag(aN, -volumes[2]) + get_diag(aS, volumes[2]) + get_diag(aW, -volumes[2]*volumes[3]) + get_diag(aE, volumes[2]*volumes[3])
+        return A
+	end
+			
+	function get_diag(array, k=0)
+        """
+        Método para construir una matriz diagonal dado un arreglo 2D y 
+		la diagonal en que queremos poner ese arreglo
+        """
+		N = size(array)[1]
+				
+        if N > 50
+            return spdiagm(k => array)
+        else
+            return diagm(k => array)
+		end
+	end
     
     
-    def get_b_vector(self):
+    function get_vector_b(Su)
         """
         Método para obtener el vector b, de la ecuación Ax = b, a partir del arreglo Su construido anteriormente
         """
-        self.b = np.ravel(self.Su)
-        return self.b
+        b = [(Su...)...]
+        return b
+	end
     
+    function solve(A,b)
+        return A\b
+	end
     
-    def solve(self,A,b):
-        if len(b)>50:
-            return spsolve(A,b)
-        else:
-            return np.linalg.solve(A,b)
-    
-    def get_solution(self):
+    function get_solution(eq_system::EqSystem)
         """
         Método para obtener los valores de la solución al sistema
         """
-        A = self.get_A_matrix()
-        b = self.get_b_vector()
-        return self.solve(A, b)
+        A = eq_system.A
+        b = eq_system.b
+        return solve(A, b)
+	end
+end											
 
-# ╔═╡ a934ecd4-5d4c-4764-a518-0fb01aeee45d
-md"## Ecuación de Poisson 3D"
+# ╔═╡ be61fc1a-ba3e-446a-a6b1-dde755788d74
+begin
+	equation_system = init_eq_system(coeff)
+	solution = get_solution(equation_system)
+end
 
-# ╔═╡ 3e0e018b-a006-45f4-8d7b-e58f944cc972
-
+# ╔═╡ 35a79c49-d7e3-4368-b596-d9ca506b0bf9
+begin
+	(X,Y,Z) = mesh.centers
+	coordinates = [[x,y,z] for x ∈ X, y ∈ Y,  z ∈ Z]
+	x = [[coordinate[1] for coordinate ∈ coordinates]...]
+	y = [[coordinate[2] for coordinate ∈ coordinates]...]
+	z = [[coordinate[3] for coordinate ∈ coordinates]...]
+	scatter(x,y,z, marker_z=solution, color=:plasma)
+end
 
 # ╔═╡ Cell order:
 # ╟─014b9495-588e-4485-a26f-81807624d7b5
@@ -1022,23 +1022,14 @@ md"## Ecuación de Poisson 3D"
 # ╟─226a6ac4-3f23-454a-9d7c-737cc316e11c
 # ╠═6eb2ab18-da3f-4433-85f1-ead20aa2fb80
 # ╠═2b833859-dd6a-4dc6-9640-b206cd254413
-# ╠═ca72c120-e0b0-4bdc-8641-1d65aa1fdd9f
 # ╠═ed1a1dbd-6aab-48b3-9a06-354cd6adc77e
-# ╠═7b0d3a85-1eab-4726-a6f1-7b2a782a804d
 # ╠═b59b0526-5e2a-478f-a16d-4de6572bab5e
-# ╠═8f8169ae-214f-4d2a-8fef-0ba170dcefdf
 # ╠═314ec1b1-d930-4f95-b31d-474bd7c8a357
-# ╠═f701a90a-1814-4398-a910-7940efdec556
 # ╠═eb9f3443-0032-41ca-8a55-9a38d8a2e3a9
-# ╠═fb79c628-780e-40ed-bc3f-9670264bfa3b
 # ╠═4d43abf5-2b9a-4f4e-a060-d2cc7bbf72a9
-# ╠═43407e34-b7cb-4a4e-9892-59b39ee38af7
 # ╠═c58ea7b0-daeb-4340-ba1f-cb297ab0ac77
 # ╠═2bff23a2-ffe8-4288-b473-74ba8d023763
-# ╟─f5e04936-f01e-487e-831b-b518ddedf103
 # ╠═3b71ed0f-53fb-4382-bcfb-786dd85f0ad1
-# ╠═23d190c8-4c51-4f05-b8a4-0573f10d8c11
-# ╠═912c556a-4ffd-4e49-a35e-ac83c77c112a
 # ╟─b5ed1976-b09a-4a60-83ce-2455d5d63755
 # ╠═299fb45f-0579-42a4-8e28-46f8b818ecc9
 # ╠═cadfb39c-3487-460b-972e-2af7d348bed9
@@ -1050,8 +1041,11 @@ md"## Ecuación de Poisson 3D"
 # ╠═2be171c0-009c-4006-a5db-e3f3cd0ef490
 # ╠═4b58c8c2-82d7-4fdf-ab9a-6ed248022ed3
 # ╠═0f0e2768-83bc-45f3-9507-cd8d25209bab
-# ╠═c0728e21-240f-4f38-98b7-caa943842afb
+# ╟─f5e04936-f01e-487e-831b-b518ddedf103
 # ╟─3f1cd4d3-9052-4271-9e4e-8965c4e99170
+# ╠═c03ddaea-977f-4c3c-9d7e-52054850507b
 # ╠═35fb94be-3647-4156-b82e-b54baa167fba
 # ╟─a934ecd4-5d4c-4764-a518-0fb01aeee45d
 # ╠═3e0e018b-a006-45f4-8d7b-e58f944cc972
+# ╠═be61fc1a-ba3e-446a-a6b1-dde755788d74
+# ╠═35a79c49-d7e3-4368-b596-d9ca506b0bf9
