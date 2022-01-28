@@ -805,7 +805,7 @@ module FVM
 	md"## Sistema de ecuaciones"
 
 	mutable struct EqSystem
-		A::Array
+		A
 		b::Vector
 	end
 
@@ -834,7 +834,7 @@ module FVM
 	end
 	    
 	    
-	function get_matrix_A(aP::Array, aW::Array, aE::Array)
+	function get_matrix_A(aP::Array{Float64, 3}, aW::Array{Float64, 3}, aE::Array{Float64, 3})
 	    """
 	    Método para construir la matriz A, de la ecuación Ax=b, a partir de los coeficientes obtenidos.
 	    """
@@ -857,8 +857,8 @@ module FVM
 		return A
 	end
 
-	function get_matrix_A(aP::Array, aW::Array, aE::Array, aN::Array, aS::Array,
-			aT::Array, aB::Array, volumes::Array)
+	function get_matrix_A(aP::Array{Float64, 3}, aW::Array{Float64, 3}, aE::Array{Float64, 3}, 
+				aN::Array{Float64, 3}, aS::Array{Float64, 3}, aT::Array{Float64, 3}, aB::Array{Float64, 3}, volumes::Array)
 		aP = [(aP...)...]
 	    A = get_diag(aP)
 		aT = [(aT...)...][2:end]
@@ -873,17 +873,17 @@ module FVM
 	    return A
 	end
 			
-	function get_diag(array, k=0)
+	function get_diag(vector::Vector{Float64}, k=0)
 	    """
 	    Método para construir una matriz diagonal dado un arreglo 2D y 
 		la diagonal en que queremos poner ese arreglo
 	    """
-		N = size(array)[1]
-				
+		N = size(vector)[1]
+		
 	    if N > 50
-		return spdiagm(k => array)
+			return spdiagm(k => vector)
 	    else
-		return diagm(k => array)
+			return diagm(k => vector)
 		end
 	end
 
@@ -895,8 +895,14 @@ module FVM
 	    b = [(Su...)...]
 	    return b
 	end
+			
+			
+	function solve(A::Array{Float64,2}, b::Vector{Float64})
+	    return A\b
+	end
+	
 
-	function solve(A,b)
+	function solve(A::SparseArrays.SparseMatrixCSC{Float64, Int64}, b::Vector{Float64})
 	    return A\b
 	end
 
