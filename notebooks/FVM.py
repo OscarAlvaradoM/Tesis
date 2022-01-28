@@ -880,7 +880,7 @@ class EqSystem():
         poner ese arreglo
         """
         if self.N > 50:
-            return diags(array, k)
+            return diags(array, k, format="csc")
         else:
             return np.diag(array,k)
         
