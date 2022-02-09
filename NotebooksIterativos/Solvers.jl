@@ -24,14 +24,16 @@ module Solvers
 	end
 
 	function vectorizedjacobi(A, b, ϵ = 1e-5)
-		dA = diag(A)
+		D = diag(A)
 		N = - triu(A,1) - tril(A,-1)
 		x = 0*b;
 		normres = [];
 		counter = 0
 		while norm(A*x - b) > ϵ
-		    x = (N*x + b)./dA
-		    counter+=1
+		    println(norm(A*x - b))
+                    x = (N*x + b)./D
+                    counter+=1
+                    println(counter)
 		end
 		return counter
 	end
@@ -92,7 +94,8 @@ module Solvers
 		p = Array{Float64}(undef, size(r,1), 1)
 		
 		counter = 0
-		while  norm(res) > ϵ
+		while norm(res) > ϵ
+		    println(norm(res))
 		    # Aquí iría la condición más chida de precondicionamiento
 		    ρ[1] = ρ[2] # Utilizamos sólo dos actualizaciones hacia atrás, por eso esto sí es una lista.
 		    ρ[2] = r'*r # Aquí cambia cuando es precondicionada
@@ -108,6 +111,7 @@ module Solvers
 		    r = r - α*q
 		    res = b - A*x
 		    counter+=1
+		    println(counter)
 		end
 		return counter
 	end
