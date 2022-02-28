@@ -10,10 +10,12 @@ module Solvers
 		D = Diagonal(A)
 		N = - triu(A,1) - tril(A,-1)
 		x = rand(length(b))
+		counter = 0
 		while norm(A*x - b) > ϵ
 		    x = D\(N*x + b)
+		    counter+=1
 		end
-		return Vector(x)
+		return counter
 	end
 
 	function paralleljacobi(A::SparseMatrixCSC{Float64, Int64}, b::Vector{Float64}, ϵ = 1e-5)
@@ -25,10 +27,12 @@ module Solvers
 		A = CuSparseMatrixCSR{Float64}(A)
 		b = CuArray{Float64}(b)
 		x = CUDA.rand{Float64}(length(b))
+		counter = 0
 		while norm(A*x - b) > ϵ
 		    x = D\(N*x + b)
+			counter+=1
 		end
-		return x
+		return counter
 	end
 
 	function vectorizedgaussseidel(A::SparseMatrixCSC{Float64, Int64}, b::Vector{Float64}, ϵ = 1e-5)
@@ -38,10 +42,12 @@ module Solvers
 		U = - triu(A,1) 
 		L₀ = tril(A,0)
 		x = rand(length(b))
+		counter = 0
 		while norm(A*x - b) > ϵ
 		    x = L₀\(U*x + b)
+			counter+=1
 		end
-		return x
+		return counter
 	end
 
 	function parallelgaussseidel(A::SparseMatrixCSC{Float64, Int64}, b::Vector{Float64}, ϵ = 1e-5)
@@ -56,10 +62,12 @@ module Solvers
 		A = CuSparseMatrixCSR{Float64}(A)
 		b = CuArray{Float64}(b)
 		x = CUDA.rand{Float64}(length(b))
+		counter = 0
 		while norm(A*x - b) > ϵ
 		    x = L₀\(U*x + b)
+			counter+=1
 		end
-		return x
+		return counter
 	end
 
 	function vectorizedsor(A::SparseMatrixCSC{Float64, Int64}, b::Vector{Float64}, ω = 1.79::Float64, ϵ = 1e-5)
@@ -76,10 +84,12 @@ module Solvers
 		L′ = D-ω*L
 		U′ = ω*U+(1.0-ω)*D
 		b′ = ω*b
+		counter = 0
 		while norm(A*x - b) > ϵ
 		    x = L′ \ (U′*x + b′)
+			counter+=1
 		end
-		return x
+		return counter
 	end
 
 	function parallelsor(A::SparseMatrixCSC{Float64, Int64}, b::Vector{Float64}, ω = 1.79::Float64, ϵ = 1e-5)
@@ -100,10 +110,12 @@ module Solvers
 		L′ = D-ω*L
 		U′ = ω*U+(1.0-ω)*D
 		b′ = ω*b
+		counter = 0
 		while norm(A*x - b) > ϵ
 		    x = L′ \ (U′*x + b′)
+			counter+=1
 		end
-		return x
+		return counter
 	end
 
 	function leastsquares(H::Matrix{Float64}, r)
@@ -122,6 +134,7 @@ module Solvers
 		x = x₀
 		H = zeros(2,1)
 		residual = residual₀
+		counter = 0
 		while norm(residual) > ϵ
 		    y = A*q[k]
 		    for j ∈ 1:k
@@ -139,8 +152,9 @@ module Solvers
 		        residual = A*x - b
 		    end
 		    k += 1
+			counter+=1
 		end
-		return x
+		return counter
 	end
 
 	# Algoritmo sacado directo del pseudocódigo
@@ -156,6 +170,7 @@ module Solvers
 		x = x₀
 		H = zeros(2,1)
 		residual = residual₀
+		counter = 0
 		while norm(residual) > ϵ
 		    y = A*q[k]
 		    for j ∈ 1:k
@@ -175,8 +190,9 @@ module Solvers
 		        residual = A*x - b
 		    end
 		    k += 1
+			counter+=1
 		end
-		return x
+		return counter
 	end
 
 	function reiniciarvariables(x::Vector, A::SparseMatrixCSC{Float64, Int64}, b::Vector{Float64})
@@ -186,6 +202,27 @@ module Solvers
 		H = zeros(2,1)
 		q = [r / norm(r)]
 		return x₀, r, q, k, H
+	end
+	
+	function obtenermodulo(dims)
+		if dims == 10
+			modulo = 15
+		elseif dims == 20
+			modulo = 20
+		elseif dims == 30
+			modulo = 35
+		elseif dims == 40
+			modulo = 25
+		elseif dims == 50
+			modulo = 15
+		elseif dims == 60
+			modulo = 15
+		elseif dims == 80
+			modulo = 30
+		elseif dims == 100
+			modulo = 35
+		end
+		return modulo
 	end
 		
 	function gmresreiniciado(A::SparseMatrixCSC{Float64, Int64}, b::Vector{Float64}, ϵ = 1e-5)
@@ -197,6 +234,8 @@ module Solvers
 		x = x₀
 		H = zeros(2,1)
 		residual = residual₀
+		counter = 0
+		modulo = obtenermodulo(sqrt(length(b))
 		while norm(residual) > ϵ
 		    y = A*q[k]
 		    for j ∈ 1:k
@@ -208,16 +247,16 @@ module Solvers
 		    H = vcat(H, zeros(1, size(H)[2]))
 		    H = hcat(H, zeros(size(H)[1], 1))
 		    k += 1
-		    #if k % 25 == 0 # cuando tenemos 30³ nuestra matriz ( Q = 5,400,000)
-		    if k % 25 == 0 # cuando tenemos 40³ nuestra matriz ( Q = 10,240,000)
+		    if k % modulo == 0 
 		        c = leastsquares(H, residual₀)
 		        Q = hcat(q...)
 		        x = Q*c + x₀
 		        residual = A*x - b
 		        x₀, residual₀, q, k, H = reiniciarvariables(x, A, b)
 		    end
+			counter+=1
 		end
-		return x
+		return counter
 	end
 
 	function reiniciarvariables(x, A, b)
@@ -241,6 +280,8 @@ module Solvers
 		x = x₀
 		H = zeros(2,1)
 		residual = residual₀
+		counter = 0
+		modulo = obtenermodulo(sqrt(length(b))
 		while norm(residual) > ϵ
 		    y = A*q[k]
 		    for j ∈ 1:k
@@ -252,8 +293,7 @@ module Solvers
 		    H = vcat(H, zeros(1, size(H)[2]))
 		    H = hcat(H, zeros(size(H)[1], 1))
 		    k += 1
-		    #if k % 25 == 0 # cuando tenemos 30³ nuestra matriz ( Q = 5,400,000)
-		    if k % 25 == 0 # cuando tenemos 40³ nuestra matriz ( Q = 10,240,000)
+		    if k % modulo == 0
 		        c = leastsquares(H, residual₀)
 		        Q = hcat(q...)
 		        c = CuArray{Float64}(c)
@@ -262,8 +302,9 @@ module Solvers
 		        residual = A*x - b
 		        x₀, residual₀, q, k, H = reiniciarvariables(x, A, b)
 		    end
+			counter+=1
 		end
-		return x
+		return counter
 	end
 
 	function precondition(name)
@@ -288,7 +329,6 @@ module Solvers
 			M_sor_2 = D+α*U
 			return [M_sor_1, M_sor_2]
 		end
-		
 	end
 
 	function gmresprecondicionado(A::SparseMatrixCSC{Float64, Int64}, b::Vector{Float64}, precondition_name::String, ϵ = 1e-5)
@@ -303,6 +343,7 @@ module Solvers
 		x = x₀
 		H = zeros(2,1)
 		residual = residual₀
+		counter = 0
 		while norm(residual) > ϵ
 		    ω = A*q[k]
 		    [ω = M\ω for M ∈ Ms]
@@ -322,8 +363,9 @@ module Solvers
 		        [residual = M\residual for M ∈ Ms]
 		    end
 		    k += 1
+			counter+=1
 		end
-		return x
+		return counter
 	end
 
 	function parallelgmresprecondicionado(A::SparseMatrixCSC{Float64, Int64}, b::Vector{Float64}, precondition_name::String, ϵ = 1e-5)
@@ -341,6 +383,7 @@ module Solvers
 		x = x₀
 		H = zeros(2,1)
 		residual = residual₀
+		counter = 0
 		while norm(residual) > ϵ
 		    ω = A*q[k]
 		    [ω = M\ω for M ∈ Ms]
@@ -362,8 +405,69 @@ module Solvers
 		        [residual = M\residual for M ∈ Ms]
 		    end
 		    k += 1
+			counter+=1
 		end
-		return x
+		return counter
+	end
+	
+	function obtenermoduloprecondicionado(precondition_name, dims)
+		if precondition_name == "Jacobi"
+			if dims == 10
+				modulo = 15
+			elseif dims == 20
+				modulo = 20
+			elseif dims == 30
+				modulo = 35
+			elseif dims == 40
+				modulo = 25
+			elseif dims == 50
+				modulo = 15
+			elseif dims == 60
+				modulo = 15
+			elseif dims == 80
+				modulo = 30
+			elseif dims == 100
+				modulo = 35
+			end
+		
+		elseif precondition_name == "Gauss-Seidel"
+			if dims == 10
+				modulo = 20
+			elseif dims == 20
+				modulo = 30
+			elseif dims == 30
+				modulo = 25
+			elseif dims == 40
+				modulo = 20
+			elseif dims == 50
+				modulo = 20
+			elseif dims == 60
+				modulo = 25
+			elseif dims == 80
+				modulo = 30
+			elseif dims == 100
+				modulo = 25
+			end		
+		elseif precondition_name == "SOR"
+			if dims == 10
+				modulo = 20
+			elseif dims == 20
+				modulo = 15
+			elseif dims == 30
+				modulo = 25
+			elseif dims == 40
+				modulo = 30
+			elseif dims == 50
+				modulo = 15
+			elseif dims == 60
+				modulo = 15
+			elseif dims == 80
+				modulo = 30
+			elseif dims == 100
+				modulo = 20
+			end				
+		end
+		return modulo
 	end
 
 	function reiniciarvariablesprecondicionado(x::Vector, A::SparseMatrixCSC{Float64, Int64}, b::Vector{Float64}, Ms::Vector)
@@ -376,7 +480,6 @@ module Solvers
 		return x₀, residual₀, q, k, H
 	end
 
-	# Algoritmo sacado directo del pseudocódigo
 	function gmresprecondicionadoreiniciado(A::SparseMatrixCSC{Float64, Int64}, b::Vector{Float64}, precondition_name::String, ϵ = 1e-5)
 		x₀ = rand(length(b))
 		Ms = precondition(precondition_name)
@@ -388,6 +491,8 @@ module Solvers
 		x = x₀
 		H = zeros(2,1)
 		residual = residual₀
+		counter = 0
+		modulo = obtenermoduloprecondicionado(precondition_name, sqrt(length(b))
 		while norm(residual) > ϵ
 		    ω = A*q[k]
 		    [ω = M\ω for M ∈ Ms]
@@ -400,20 +505,17 @@ module Solvers
 		    H = vcat(H, zeros(1, size(H)[2]))
 		    H = hcat(H, zeros(size(H)[1], 1))
 		    k += 1
-		    # if k % 20 == 0 # Para 40³ sirvió chido el módulo 20 para el de Jacobi
-		    # if k % 25 == 0 # Para 40³ sirvió chido el módulo 25 para el de Gauss-Seidel
-		    if k % 30 == 0 # Para 40³ sirvió chido el módulo 30 para el de SOR
+		    if k % modulo == 0
 		        c = leastsquares(H, residual₀)
 		        Q = hcat(q...)
-		        c = CuArray{Float64}(c)
-		        Q = CuSparseMatrixCSR{Float64}(Q)
 		        x = Q*c + x₀
 		        residual = A*x - b
 		        [residual = M\residual for M ∈ Ms]
 		        x₀, residual₀, q, k, H = reiniciarvariablesprecondicionado(x, A, b, Ms)
 		    end
+			counter+=1
 		end
-		return x
+		return counter
 	end
 
 	function reiniciarvariablesprecondicionado(x, A, b, Ms::Vector)
@@ -427,9 +529,11 @@ module Solvers
 		return x₀, residual₀, q, k, H
 	end
 
-	# Algoritmo sacado directo del pseudocódigo
 	function parallelgmresprecondicionadoreiniciado(A::SparseMatrixCSC{Float64, Int64}, b::Vector{Float64}, precondition_name::String, ϵ = 1e-5)
-		x₀ = rand(length(b))
+		b = CuArray{Float64}(b)
+		A = CuSparseMatrixCSR{Float64}(A)
+		x₀ = CUDA.rand{Float64}(length(b))
+		
 		Ms = precondition(precondition_name)
 		residual₀ = b - A*x₀
 		[residual₀ = M\residual₀ for M ∈ Ms]
@@ -439,6 +543,8 @@ module Solvers
 		x = x₀
 		H = zeros(2,1)
 		residual = residual₀
+		counter = 0
+		modulo = obtenermoduloprecondicionado(precondition_name, sqrt(length(b))
 		while norm(residual) > ϵ
 		    ω = A*q[k]
 		    [ω = M\ω for M ∈ Ms]
@@ -451,17 +557,18 @@ module Solvers
 		    H = vcat(H, zeros(1, size(H)[2]))
 		    H = hcat(H, zeros(size(H)[1], 1))
 		    k += 1
-		    # if k % 20 == 0 # Para 40³ sirvió chido el módulo 20 para el de Jacobi
-		    # if k % 25 == 0 # Para 40³ sirvió chido el módulo 25 para el de Gauss-Seidel
-		    if k % 30 == 0 # Para 40³ sirvió chido el módulo 30 para el de SOR
+		    if k % modulo == 0
 		        c = leastsquares(H, residual₀)
 		        Q = hcat(q...)
+   		        c = CuArray{Float64}(c)
+		        Q = CuSparseMatrixCSR{Float64}(Q)
 		        x = Q*c + x₀
 		        residual = A*x - b
 		        [residual = M\residual for M ∈ Ms]
 		        x₀, residual₀, q, k, H = reiniciarvariablesprecondicionado(x, A, b, Ms)
 		    end
+			counter+=1
 		end
-		return x
+		return counter
 	end
 end
