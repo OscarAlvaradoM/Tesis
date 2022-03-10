@@ -1,6 +1,5 @@
-using Statistics, CSV, Tables
+using Statistics, CSV, Tables, LinearAlgebra, SparseArrays
 
-#include("../notebooks/FVM.jl")
 include("FVM.jl")
 
 include("solvers.jl")
@@ -32,33 +31,33 @@ end
 function iteratevolumes(volumes::Array{Int, 1}, times::Int)
     for volume ∈ volumes
         A, b = getsystem(volume)
-        solvers = [Solvers.vectorizedjacobi, Solvers.paralleljacobi, 
-        Solvers.vectorizedgaussseidel, Solvers.parallelgaussseidel, 
-        Solver.vectorizedsor, Solver.parallelsor, 
-        Solver.gmres, Solver.parallelgmres, 
-        Solver.gmresreiniciado, Solver.parallelgmresreiniciado, 
-        Solver.gmresprecondicionado, Solver.parallelgmresprecondicionado,
-        Solver.gmresprecondicionadoreiniciado , Solver.parallelgmresprecondicionadoreiniciado]
-        names = ["Jacobi", "Gauss-Seidel", "SOR", "Jacobi", "Gauss-Seidel", "SOR"]
-        idx_1 = 1
-        idx_2 = 1
+        solvers = [Solvers.vectorizedjacobi, 
+        #Solvers.paralleljacobi, 
+        Solvers.vectorizedgaussseidel, 
+        #Solvers.parallelgaussseidel]
+        Solvers.vectorizedsor, 
+        #Solvers.parallelsor, 
+        Solvers.gmres,
+        #Solvers.parallelgmres, 
+        Solvers.gmresreiniciado, 
+        #Solvers.parallelgmresreiniciado, 
+        Solvers.gmresprecondicionado, 
+        #Solvers.parallelgmresprecondicionado,
+        Solvers.gmresprecondicionadoreiniciado]
+        #Solvers.parallelgmresprecondicionadoreiniciado]
+        names = ["Jacobi", "Gauss-Seidel", "SOR"]
         for solver ∈ solvers
             println("Comencé el de $volume volúmenes con el solver $solver")
-            if "precondicionado" in string(solver)
-            	if "parallel" not in string(solver)
-            		list_of_time_statistics = list_of_statistics(solver, names[idx_1], A, b, volume, times)
-            		idx_1+=1
-	            	writetofile(solver, names[idx_1], list_of_time_statistics')            		
-            	else
-            		list_of_time_statistics = list_of_statistics(solver, names[idx_2], A, b, volume, times)
-            		idx_2+=1
-	            	writetofile(solver, names[idx_2], list_of_time_statistics')
-            	end
+            if occursin("precondicionado",string(solver))
+                println("Precondicionado")
+                for name ∈ names
+                    list_of_time_statistics = list_of_statistics(solver, name, A, b, volume, times)
+                    writetofile(solver, name, list_of_time_statistics')
+                end
             else
-	            list_of_time_statistics = list_of_statistics(solver, A, b, volume, times)
-	            writetofile(solver, list_of_time_statistics')
-	        end
-	    @show list_of_time_statistics
+                list_of_time_statistics = list_of_statistics(solver, A, b, volume, times)
+                writetofile(solver, list_of_time_statistics')
+            end
         end
         println("Terminé el de $volume volúmenes")
     end
@@ -84,12 +83,9 @@ function getstatistics(solver, A::SparseMatrixCSC{Float64, Int64}, b::Vector{Flo
     time_list = []
     iterations_list = []
     for i ∈ 1:(times+1)
-	println("Estoy en la medición $i del tiempo")
         t, iterations = measuretime(solver, A, b)
         push!(time_list, t)
         push!(iterations_list, iterations)
-	@show t
-	@show iterations
     end
     times_without_compiling = time_list[2:end]
     iterations_without_compiling = iterations_list[2:end]
@@ -105,12 +101,9 @@ function getstatistics(solver, name::String, A::SparseMatrixCSC{Float64, Int64},
     time_list = []
     iterations_list = []
     for i ∈ 1:(times+1)
-	println("Estoy en la medición $i del tiempo")
         t, iterations = measuretime(solver, name, A, b)
         push!(time_list, t)
         push!(iterations_list, iterations)
-	@show t
-	@show iterations
     end
     times_without_compiling = time_list[2:end]
     iterations_without_compiling = iterations_list[2:end]
@@ -149,6 +142,6 @@ function writetofile(solver, name, list)
     CSV.write("../../benchmarking/solvers/$(file_name)_$(name).csv", Tables.table(list), delim = ',',append=true)
 end
 
-volumes = [10,20,30,40,50,60,80,100]
+volumes = [10]
 times = 10
 iteratevolumes(volumes, times)
