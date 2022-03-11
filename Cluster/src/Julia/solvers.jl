@@ -63,28 +63,23 @@ module Solvers
         # Según el libro, viene siendo así el método matricial: x⁽ᵏ⁾= (D-L)⁻¹(Ux⁽ᵏ⁻¹⁾+b)
         # Con D := La matriz diagonal A como matriz cuadrada,
         # -L y -U las matrices estríctamente Inferior (Lower) y Superior (Upper) de A, respectivamente
-        U = - triu(A,1) 
+        U = - triu(A,1)
         L₀ = tril(A,0)
-        d_U = CuSparseMatrixCSR{Float64}(U)
-        d_L₀ = CuSparseMatrixCSR{Float64}(L)
+        d_U = CuSparseMatrixCSC{Float64}(U)
 
-        d_A = CuSparseMatrixCSR{Float64}(A)
+        d_A = CuSparseMatrixCSC{Float64}(A)
         d_b = CuArray{Float64}(b)
         d_x = CUDA.rand(Float64, size(b))
 
-        d = diag(L₀)
-        d_d = CuArray{Float64}(d)
-        N = - tril(L₀,-1)
-        d_N = CuSparseMatrixCSR{Float64}(N)
-    
         counter = 0
         while norm(d_A*d_x - d_b) > ϵ
-            #x = LowerTriangular(L₀)\(U*x + b)
-            x = jacobiparallelsolver(d_L₀, d_U*d_x + d_b, d_x, d_d, d_N, ϵ)
+            new_b = Array(d_U*d_x + d_b)
+            d_x = CuArray{Float64}(L₀\new_b)
             counter+=1
         end
         return counter
     end
+
 
     function sor(A::SparseMatrixCSC{Float64, Int64}, b::Vector{Float64}, ω = 1.79::Float64, ϵ = 1e-5)
         # Según el libro, viene siendo así el método matricial: x⁽ᵏ⁾= (D-ωL)⁻¹(ωU+(1-ω)D)x⁽ᵏ⁻¹⁾+ω(D-ωL)⁻¹b
@@ -113,33 +108,29 @@ module Solvers
         # Con D := La matriz diagonal A como matriz cuadrada,
         # -L y -U las matrices estríctamente Inferior (Lower) y Superior (Upper) de A, respectivamente
         D = Diagonal(A)
-        U = - triu(A,1) 
+        U = - triu(A,1)
         L = - tril(A,-1)
 
         L′ = D-ω*L
         U′ = ω*U+(1.0-ω)*D
         b′ = ω*b
 
-        d_U′ = CuSparseMatrixCSR{Float64}(U′)
-        d_L′ = CuSparseMatrixCSR{Float64}(L′)
+        d_U′ = CuSparseMatrixCSC{Float64}(U′)
         d_b′ = CuArray{Float64}(b′)
-        d_A = CuSparseMatrixCSR{Float64}(A)    
+
+        d_A = CuSparseMatrixCSC{Float64}(A)
         d_b = CuArray{Float64}(b)
         d_x = CUDA.rand(Float64, size(b))
-    
-        d = diag(L′)
-        d_d = CuArray{Float64}(d)
-        N = - tril(L′,-1)
-        d_N = CuSparseMatrixCSR{Float64}(N)
 
         counter = 0
         while norm(d_A*d_x - d_b) > ϵ
-            #x = LowerTriangular(L′) \ (U′*x + b′)
-            x = jacobiparallelsolver(d_L′, d_U′*d_x + d_b′, d_x, d_d, d_N, ϵ)
+            new_b = Array(d_U′*d_x + d_b′)
+            d_x = CuArray{Float64}(L′\new_b)
             counter+=1
         end
         return counter
     end
+
 
     function leastsquares(H, r)
         r′ = zeros(size(H)[1])
