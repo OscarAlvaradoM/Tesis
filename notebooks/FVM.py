@@ -4,7 +4,7 @@
 
 # Importando librerías
 import numpy as np
-#import plotly.graph_objects as go
+import plotly.graph_objects as go
 from scipy.sparse.linalg import spsolve
 #import matplotlib.pyplot as plt
 
@@ -349,31 +349,34 @@ class Mesh():
             print(f"List of {var.lower()} positions of volumes: \n{self.coords[idx]}")
             print(f"List of {var.lower()} positions of domain nodes: \n{self.dominios[idx]}")
             
-            
-#     def draw(self):
-#         """
-#         Método para graficar la malla. Este método se invoca hasta que se hayan inizializado todas las condiciones
-#         de frontera.
-#         """
-#         # Graficamos las fronteras, sean o no activas
-#         dic_colors = {"D": "darkturquoise", "N": "red", "S": "magenta", "Off": "white", "I": "gray"}
-#         condiciones = [list(self.__tags_fronteras[key]["cond"].keys())[0] \
-#                        if list(self.__tags_fronteras[key]["frontera"].values())[0] == "ON" \
-#                        else "Off" for key in list(self.__tags_fronteras.keys())]
-#         colores = [dic_colors[cond] for cond in condiciones]
-#         # Obtenemos las coordenadas de las fronteras y de los nodos internos.
-#         coordenadas = [] # Aquí se pondrán las coordenadas de las fronteras
-#         coord = [] # Aquí las coordendas de los nodos internos
-#         for i in range(3):
-#             coordenadas.append([self.__tags_fronteras[key]["coord"][i] \
-#                                 for key in list(self.__tags_fronteras.keys())])
-#             coord.append([self.__tags[key]["coord"][i] for key in list(self.__tags.keys())])
-#         fig = go.Figure(data = go.Scatter3d(x = coordenadas[0], y = coordenadas[1], z = coordenadas[2],
-#                                           mode = 'markers', marker = dict(color = colores, 
-#                                                                           symbol = "square", size = 2)))
-#         fig.add_trace(go.Scatter3d(x = coord[0], y = coord[1], z = coord[2],
-#                                               mode = 'markers', marker = dict(color = "blue", size = 5)))
-#         fig.show()
+
+    def draw(self):
+        """
+        Método para graficar la malla. Este método se invoca hasta que se hayan inizializado todas las condiciones
+        de frontera.
+        """
+        # Graficamos las fronteras, sean o no activas
+        dic_colors = {"D": "darkturquoise", "N": "red", "S": "magenta", "Off": "white", "I": "gray"}
+        condiciones = [list(self.__tags_fronteras[key]["cond"].keys())[0] \
+                       if list(self.__tags_fronteras[key]["frontera"].values())[0] == "ON" \
+                       else "Off" for key in list(self.__tags_fronteras.keys())]
+#         alphas = [list(mesh._Mesh__tags_fronteras[key]["cond"].values())[0] \
+#                        if list(mesh._Mesh__tags_fronteras[key]["frontera"].values())[0] == "ON" \
+#                        else "Off" for key in list(mesh._Mesh__tags_fronteras.keys())]
+        colores = [dic_colors[cond] for cond in condiciones]
+        # Obtenemos las coordenadas de las fronteras y de los nodos internos.
+        coordenadas = [] # Aquí se pondrán las coordenadas de las fronteras
+        coord = [] # Aquí las coordendas de los nodos internos
+        for i in range(3):
+            coordenadas.append([self.__tags_fronteras[key]["coord"][i] \
+                                for key in list(self.__tags_fronteras.keys())])
+            coord.append([self.__tags[key]["coord"][i] for key in list(self.__tags.keys())])
+        fig = go.Figure(data = go.Scatter3d(x = coordenadas[0], y = coordenadas[1], z = coordenadas[2],
+                                          mode = 'markers', name = "Condición de frontera", 
+                                            marker = dict(color = colores, symbol = "square", size = 2)))
+        fig.add_trace(go.Scatter3d(x = coord[0], y = coord[1], z = coord[2], name = "Volúmenes",
+                                              mode = 'markers', marker = dict(color = "blue", size = 5)))
+        fig.show()
 
 
     def get_area(self, direction = 0, extended=False):
@@ -941,3 +944,17 @@ class EqSystem():
         A = self.get_A_matrix()
         b = self.get_b_vector()
         return self.solve(A, b)
+    
+    def plot_solution(self, mesh):
+        """
+        Método para graficar el mapa de calor de las soluciones en 3 dimensiones.
+        """
+        x,y,z = [np.array(coord) for coord in mesh.coords]
+        xv, yv, zv = np.meshgrid(x, y, z, indexing='ij')
+
+        fig = go.Figure(data = go.Scatter3d(x = xv.ravel(), y = yv.ravel(), z = zv.ravel(), mode = 'markers', 
+                                            marker = dict(color = self.get_solution(), 
+                                                        symbol = "square", size = 5, colorbar = {"bgcolor":"white"}), 
+                                            text = self.get_solution()))
+        fig.show()
+        
