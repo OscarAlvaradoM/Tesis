@@ -4,9 +4,12 @@
 
 # Importando librerías
 import numpy as np
-import plotly.graph_objects as go
+#import plotly.graph_objects as go
 from scipy.sparse.linalg import spsolve
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
+
+# Sistema de ecuaciones
+from scipy.sparse import diags
 
 # Mesh 
 
@@ -347,30 +350,30 @@ class Mesh():
             print(f"List of {var.lower()} positions of domain nodes: \n{self.dominios[idx]}")
             
             
-    def draw(self):
-        """
-        Método para graficar la malla. Este método se invoca hasta que se hayan inizializado todas las condiciones
-        de frontera.
-        """
-        # Graficamos las fronteras, sean o no activas
-        dic_colors = {"D": "darkturquoise", "N": "red", "S": "magenta", "Off": "white", "I": "gray"}
-        condiciones = [list(self.__tags_fronteras[key]["cond"].keys())[0] \
-                       if list(self.__tags_fronteras[key]["frontera"].values())[0] == "ON" \
-                       else "Off" for key in list(self.__tags_fronteras.keys())]
-        colores = [dic_colors[cond] for cond in condiciones]
-        # Obtenemos las coordenadas de las fronteras y de los nodos internos.
-        coordenadas = [] # Aquí se pondrán las coordenadas de las fronteras
-        coord = [] # Aquí las coordendas de los nodos internos
-        for i in range(3):
-            coordenadas.append([self.__tags_fronteras[key]["coord"][i] \
-                                for key in list(self.__tags_fronteras.keys())])
-            coord.append([self.__tags[key]["coord"][i] for key in list(self.__tags.keys())])
-        fig = go.Figure(data = go.Scatter3d(x = coordenadas[0], y = coordenadas[1], z = coordenadas[2],
-                                          mode = 'markers', marker = dict(color = colores, 
-                                                                          symbol = "square", size = 2)))
-        fig.add_trace(go.Scatter3d(x = coord[0], y = coord[1], z = coord[2],
-                                              mode = 'markers', marker = dict(color = "blue", size = 5)))
-        fig.show()
+#     def draw(self):
+#         """
+#         Método para graficar la malla. Este método se invoca hasta que se hayan inizializado todas las condiciones
+#         de frontera.
+#         """
+#         # Graficamos las fronteras, sean o no activas
+#         dic_colors = {"D": "darkturquoise", "N": "red", "S": "magenta", "Off": "white", "I": "gray"}
+#         condiciones = [list(self.__tags_fronteras[key]["cond"].keys())[0] \
+#                        if list(self.__tags_fronteras[key]["frontera"].values())[0] == "ON" \
+#                        else "Off" for key in list(self.__tags_fronteras.keys())]
+#         colores = [dic_colors[cond] for cond in condiciones]
+#         # Obtenemos las coordenadas de las fronteras y de los nodos internos.
+#         coordenadas = [] # Aquí se pondrán las coordenadas de las fronteras
+#         coord = [] # Aquí las coordendas de los nodos internos
+#         for i in range(3):
+#             coordenadas.append([self.__tags_fronteras[key]["coord"][i] \
+#                                 for key in list(self.__tags_fronteras.keys())])
+#             coord.append([self.__tags[key]["coord"][i] for key in list(self.__tags.keys())])
+#         fig = go.Figure(data = go.Scatter3d(x = coordenadas[0], y = coordenadas[1], z = coordenadas[2],
+#                                           mode = 'markers', marker = dict(color = colores, 
+#                                                                           symbol = "square", size = 2)))
+#         fig.add_trace(go.Scatter3d(x = coord[0], y = coord[1], z = coord[2],
+#                                               mode = 'markers', marker = dict(color = "blue", size = 5)))
+#         fig.show()
 
 
     def get_area(self, direction = 0, extended=False):
@@ -855,9 +858,6 @@ class Diffusion():
                 counter += 1
         return condition_mask
 
-
-# Sistema de ecuaciones
-from scipy.sparse import diags
 
 class EqSystem():
     """
