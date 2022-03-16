@@ -955,6 +955,6 @@ class EqSystem():
         fig = go.Figure(data = go.Scatter3d(x = xv.ravel(), y = yv.ravel(), z = zv.ravel(), mode = 'markers', 
                                             marker = dict(color = self.get_solution(), 
                                                         symbol = "square", size = 5, colorbar = {"bgcolor":"white"}), 
-                                            text = self.get_solution()))
+                                            text = self.get_solution()), layout = go.Layout(title = "Solución numérica"))
         fig.show()
         
