@@ -163,20 +163,6 @@ module FVM
 		return tags, tags_boundaries
 	end
 
-	function tag_wall(tags::Dict, tags_boundaries::Dict, directions::Array, values::Array, coords::Array, cond_type::Symbol=:D)
-
-		for (idx, key) ∈ enumerate(coords)
-			# Primero checamos si NO está en la frontera
-			if key ∈ keys(tags)
-				tags[key][directions[idx]][cond_type] = values[idx]
-			# Si no está fuera de la frontera,suponemos que está en ella
-			elseif key ∈ keys(tags_boundaries)
-				tags_boundaries[key]["cond"][cond_type] = values[idx]
-			end
-		end
-		return tags, tags_boundaries
-	end
-
 	function tag_wall(tags::Dict, tags_boundaries::Dict, directions::Array, values::Array, cond_type::Symbol=:D)
 		for (idx, direction) ∈ enumerate(directions)
 			tag_wall(cond_type, tags, tags_boundaries, direction, values[idx])
