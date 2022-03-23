@@ -18,4 +18,4 @@ Se organiza en 4 carpetas principales:
 - **Documentación**: Contiene la documentación de la tesis, en especial el mismo documento de tesis.
 - **Benchmarking**: Contiene los archivos de medición de tiempos de las etapas del MVF y de los solvers implementados. Es importante recalcar que contiene las mediciones de los 10 tiempos por etapa y por solver para poder hacer estadística.
 
-**Investigación realizada gracias al programa UNAM-PAPIIT IA-104721**
+**Investigación realizada gracias al programa UNAM-PAPIIT IA-104720**
