@@ -1,6 +1,6 @@
 # Tesis
 
-Repositorio con los archivos de código, documentación, imágenes y benchmarking de la tesis de Licienciatura en Física de Óscar Anuar Alvarado Morán. 
+Repositorio con los archivos de código, documentación, imágenes y benchmarking, de la versión preeliminar de mi tesis de Licienciatura en Física de Óscar Anuar Alvarado Morán. 
 
 ## Planteamiento
 El problema abordado en esta tesis es el del flujo de calor a través de un cubo,que puede ser modelado matemáticamente mediante la ecuación de Poisson o de Laplace cuando no hay convección, mientras que cuando sí la hay, simplemente es una ecuación estacionaria de difusión-convección (o advección). Este problema se encuentra inmerso en muchas situaciones de la física, tal como la electrostática, el problema del flujo irrotacional y en la gravitación. 
@@ -17,3 +17,5 @@ Se organiza en 4 carpetas principales:
 - **Imgs**: Imágenes y diagramas usados en la tesis u obtenidos de ésta, como los resultados numéricos, analíticos, la comparación entre estos y la comparación de tiempos entre los distintos solvers.
 - **Documentación**: Contiene la documentación de la tesis, en especial el mismo documento de tesis.
 - **Benchmarking**: Contiene los archivos de medición de tiempos de las etapas del MVF y de los solvers implementados. Es importante recalcar que contiene las mediciones de los 10 tiempos por etapa y por solver para poder hacer estadística.
+
+**Investigación realizada gracias al programa UNAM-PAPIIT IA-104721**
