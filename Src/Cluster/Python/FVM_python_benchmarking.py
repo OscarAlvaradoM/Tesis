@@ -61,8 +61,10 @@ def iterate_volumes(volumes, times):
     for volume in volumes:
         mesh = benchmark_mesh(volume)
         coefficients = benchmark_set_boundary_conditions(mesh)
-        functions = [benchmark_mesh, benchmark_set_boundary_conditions, benchmark_solutions]
-        args = [volume, mesh, coefficients]
+        functions = [#benchmark_mesh, benchmark_set_boundary_conditions, 
+			        benchmark_solutions]
+        args = [#volume, mesh, 
+        		coefficients]
         
         for f, arg in zip(functions, args):
             print(f"Comencé el de {volume} volúmenes con la función {f.__name__}")
@@ -113,7 +115,7 @@ def measure_time(f, arg):
 
 def write_to_file(f, list_of_times):
     file_name = f.__name__
-    with open(f'../benchmarking/{file_name}_python.csv', 'a', newline='') as f_object:  
+    with open(f'../../../Benchmarking/FVM/{file_name}_python.csv', 'a', newline='') as f_object:  
         writer_object = writer(f_object)
         writer_object.writerow(list_of_times)
         f_object.close()
@@ -122,7 +124,7 @@ def write_to_file(f, list_of_times):
 # In[ ]:
 
 
-volumes = [10,20,30,40,50,60,80,100]
+volumes = [5,10,15,20,25,30,35]
 times = 10
 iterate_volumes(volumes, times)
 
