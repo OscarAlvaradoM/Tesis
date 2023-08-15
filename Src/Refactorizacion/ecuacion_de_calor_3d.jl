@@ -1,26 +1,20 @@
 # Para ver si estamos haciendo bien las cosas en 3D
-include("FVM.jl")
+include("FVM_2.jl")
 
 vols = 10
-dim = 3
+dims = 3
 # Primero todo lo involucrado con el mallado
-volumes, lengths, centers, centers_and_boundaries, deltas, faces, deltas_faces = FVM.uniform_grid(vols, 10)
-tags = FVM.init_tags(dim, volumes, centers_and_boundaries)
-tags_b = FVM.init_tags_boundaries(dim, centers_and_boundaries)
+mesh = FVM.initialize_mesh(dims, vols, 0.1)
 
-FVM.tag_wall(tags, tags_b, [:W, :E, :T, :N, :B], 0, :D)
-FVM.tag_wall(tags, tags_b, :S, 100, :D)
-
-mesh = FVM.Mesh(volumes, lengths, centers, centers_and_boundaries, deltas, faces, deltas_faces, tags, tags_b);
+# Luego las condiciones de frontera
+FVM.tag_wall(mesh, [:W, :E, :S, :N, :B], 0, :D)
+FVM.tag_wall(mesh, :T, 100, :D)
 
 # Luego todo lo involucrado con los cálculos del FVM
-#Γ = 1000
-#tensor_Γ = ones(length(x), length(y), length(z))
-#tensor_Γ = Γ .* tensor_Γ
 function Γ_constant(x::Array, y::Array, z::Array)
     Γ = 1000
     tensor_Γ = ones(length(x), length(y), length(z))
-    tensor_Γ = Γ .* tensor_Γ
+    Γ .* tensor_Γ
 end
 # Le agregamos la difusión
 coeff = FVM.init_coefficients(mesh)
@@ -31,5 +25,3 @@ equation_system = FVM.init_eq_system(coeff)
 solution = FVM.get_solution(equation_system);
 
 FVM.plot_solution(solution, mesh)
-
-
