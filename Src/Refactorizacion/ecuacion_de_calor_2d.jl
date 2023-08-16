@@ -1,5 +1,5 @@
 # Para ver si estamos haciendo bien las cosas en 3D
-include("FVM_3.jl")
+include("FVM.jl")
 
 vols = 3
 dims = 2
@@ -7,8 +7,8 @@ dims = 2
 mesh = FVM.initialize_mesh(dims, vols, 0.1)
 
 # Luego las condiciones de frontera
-FVM.tag_wall(mesh, [:S, :W, :N], 0, :D)
-FVM.tag_wall(mesh, :E, 100, :D)
+FVM.tag_wall(mesh, [:E, :W, :N], 0, :D)
+FVM.tag_wall(mesh, :S, 100, :D)
 
 # Luego todo lo involucrado con los cálculos del FVM
 function Γ_constant(x::Array, y::Array, z::Array)

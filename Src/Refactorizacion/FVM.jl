@@ -6,10 +6,6 @@ module FVM
 	using Plots
 	plotly()
 
-
-
-	md"## Mallado"
-
 	function set_deltas(dominio::Array)
 		(dominio[2:end] - dominio[1:end-1])[2:end-1]
 	end
@@ -30,7 +26,7 @@ module FVM
 		return grid_deltas, grid_coords, grid_faces
 	end	
 
-	function uniform_grid(volume::Real, len::Real)
+	function uniformgrid(volume::Real, len::Real)
 		volumes = [volume, volume, volume]
 		lengths = [len, len, len]
 		# Separación entre todos los nodos de cada dimensión
@@ -55,6 +51,13 @@ module FVM
 		grid_deltas, grid_coords, grid_faces = get_grids(deltas, centers, faces)
 
 		return volumes, lengths, centers, centers_and_boundaries, deltas, faces, deltas_faces
+	end
+
+    function uniformgrid(dims::Int, volume::Int, length::Real)
+		volumes = [volume for _ in 1:dims]
+		lengths = [length for _ in 1:dims]
+	
+		return set_volumes_and_lengths(dims, volumes, lengths)
 	end
 
 	function init_tags(dim::Int, volumes::Array, centers_and_boundaries::Array)
@@ -111,21 +114,21 @@ module FVM
 							value = e
 						else continue end
 					elseif x != 1 && x != X
-						if z == 1 
-							var = :T
+						if z == 1
+							var = :B
 							value = t
 						elseif z == Z 
-							var = :B
+							var = :T
 							value = b
 						else continue end
 					else continue end
 				elseif z != 1 && z != Z
 					if x != 1 && x != X
 						if y == 1 
-							var = :N
+							var = :S
 							value = n
 						elseif y == Y
-							var = :S
+							var = :N
 							value = s
 						end
 					else continue end
@@ -185,7 +188,7 @@ module FVM
 	end
 
 	function tag_wall(tags::Dict, tags_boundaries::Dict, directions::Array, value::Real, cond_type::Symbol=:D)
-		for (idx, direction) ∈ enumerate(directions)
+		for direction ∈ directions
 			tag_wall(tags, tags_boundaries, direction, value, cond_type)
 		end
 		return tags, tags_boundaries
@@ -217,11 +220,89 @@ module FVM
 		tags_boundaries;
 	end 
 
+    function tag_wall(mesh::Mesh, directions::Array, values::Array, coords::Array, cond_type::Symbol=:D)
+		tags = mesh.tags
+		tags_boundaries = mesh.tags_boundaries
+		for (idx, key) ∈ enumerate(coords)
+			# Primero checamos si NO está en la frontera
+			if key ∈ keys(tags)
+				tags[key][directions[idx]][cond_type] = values[idx]
+			# Si no está fuera de la frontera,suponemos que está en ella
+			elseif key ∈ keys(tags_boundaries)
+				tags_boundaries[key]["cond"][cond_type] = values[idx]
+			end
+		end
+	end
+
+	function tag_wall(mesh::Mesh, directions::Array, value::Real, coords::Array, cond_type::Symbol=:D)
+		tags = mesh.tags
+		tags_boundaries = mesh.tags_boundaries
+		for (idx, key) ∈ enumerate(coords)
+			# Primero checamos si NO está en la frontera
+			if key ∈ keys(tags)
+				tags[key][directions[idx]][cond_type] = value
+			# Si no está fuera de la frontera,suponemos que está en ella
+			elseif key ∈ keys(tags_boundaries)
+				tags_boundaries[key]["cond"][cond_type] = value
+			end
+		end
+	end
+
+	function tag_wall(mesh::Mesh, directions::Array, values::Array, coords::Array, cond_type::Symbol=:D)
+		tags = mesh.tags
+		tags_boundaries = mesh.tags_boundaries
+		for (idx, key) ∈ enumerate(coords)
+			# Primero checamos si NO está en la frontera
+			if key ∈ keys(tags)
+				tags[key][directions[idx]][cond_type] = values[idx]
+			# Si no está fuera de la frontera,suponemos que está en ella
+			elseif key ∈ keys(tags_boundaries)
+				tags_boundaries[key]["cond"][cond_type] = values[idx]
+			end
+		end
+	end
+
+	function tag_wall(mesh::Mesh, directions::Array, values::Array, cond_type::Symbol=:D)
+		for (idx, direction) ∈ enumerate(directions)
+			tag_wall(mesh, direction, values[idx], cond_type)
+		end
+	end
+
+	function tag_wall(mesh::Mesh, directions::Array, value::Real, cond_type::Symbol=:D)
+		for direction ∈ directions
+			tag_wall(mesh, direction, value, cond_type)
+		end
+	end
+
+	function tag_wall(mesh::Mesh, direction::Symbol, value::Real, cond_type::Symbol=:D)
+		tags = mesh.tags
+		tags_boundaries = mesh.tags_boundaries
+		for key ∈ keys(tags)
+			if typeof(tags[key][direction]) == Dict
+				tags[key][direction][cond_type] = value
+			end
+		end
+		for key ∈ keys(tags_boundaries)
+			if get(tags_boundaries[key]["frontera"], direction, false)
+				tags_boundaries[key]["cond"][cond_type] = value
+			end
+		end
+	end
+
+    function initialize_mesh(dims::Int, vols::Int, length::Real)
+        volumes, lengths, centers, centers_and_boundaries, deltas, faces, deltas_faces = uniformgrid(dims, vols, length)
+        tags = init_tags(dims, volumes, centers_and_boundaries)
+        tags_b = init_tags_boundaries(dims, centers_and_boundaries)
+    
+        mesh = Mesh(volumes, lengths, centers, centers_and_boundaries, deltas, faces, deltas_faces, tags, tags_b)
+        return mesh
+    end
+
 	function set_volumes_and_lengths(volume::Real, len::Real) :: Mesh
 		volumes = [volume, 1, 1]
 		lengths = [len, len/10, len/10]
 		centers = [[(i+0.5)*len/volume for i ∈ 0:volume-1], [len/20], [len/20]]
-	 	volume_lengths = lengths/volumes
+	 	#volume_lengths = lengths/volumes
 
 		centers_and_boundaries = [copy(arr) for arr ∈ centers]
 	 	centers_and_boundaries = [insert!(arr,1,0) for arr ∈ centers_and_boundaries]
@@ -232,7 +313,7 @@ module FVM
 		faces = [vcat(0,  (coords[1:(end-1)] + coords[2:end])/2 ,  lengths[idx]) for (idx,coords) ∈ enumerate(centers)]
 
 	 	deltas_faces = get_deltas_faces(faces)
-	 	grid_deltas, grid_coords, grid_faces = get_grids(deltas, centers, faces)
+	 	#grid_deltas, grid_coords, grid_faces = get_grids(deltas, centers, faces)
 		
 		return volumes, lengths, centers, centers_and_boundaries, deltas, faces, deltas_faces
 	end
@@ -254,7 +335,49 @@ module FVM
 		faces = [vcat(0,  (coords[1:(end-1)] + coords[2:end])/2 ,  lengths[idx]) for (idx,coords) ∈ enumerate(centers)]
 
 		deltas_faces = get_deltas_faces(faces)
-		grid_deltas, grid_coords, grid_faces = get_grids(deltas, centers, faces)
+		#grid_deltas, grid_coords, grid_faces = get_grids(deltas, centers, faces)
+		
+		return volumes, lengths, centers, centers_and_boundaries, deltas, faces, deltas_faces
+	end
+
+    function set_volumes_and_lengths(dims::Int, volume::Real, len::Real)
+		volumes = [volume, 1, 1]
+		lengths = [len, len/10, len/10]
+		centers = [[(i+0.5)*len/volume for i ∈ 0:volume-1], [len/20], [len/20]]
+	 	#volume_lengths = lengths/volumes
+
+		centers_and_boundaries = [copy(arr) for arr ∈ centers]
+	 	centers_and_boundaries = [insert!(arr,1,0) for arr ∈ centers_and_boundaries]
+	 	centers_and_boundaries = [insert!(arr,length(arr)+1,lengths[idx]) for (idx,arr) ∈ enumerate(centers_and_boundaries)]
+
+	 	deltas = [length(set_deltas(dom)) != 0 ? set_deltas(dom) : [dom[end]] for dom ∈ centers_and_boundaries]
+		
+		faces = [vcat(0,  (coords[1:(end-1)] + coords[2:end])/2 ,  lengths[idx]) for (idx,coords) ∈ enumerate(centers)]
+
+	 	deltas_faces = get_deltas_faces(faces)
+	 	#grid_deltas, grid_coords, grid_faces = get_grids(deltas, centers, faces)
+		
+		return dims, volumes, lengths, centers, centers_and_boundaries, deltas, faces, deltas_faces
+	end
+
+    function set_volumes_and_lengths(dims::Int, volumes::Array, lengths::Array)
+		missing_volumes = 3 - length(volumes)
+		volumes = vcat(volumes, [1 for _ ∈ 1:missing_volumes])
+
+		missing_lengths = 3 - length(lengths)
+		lengths = vcat(lengths, [lengths[1]/10 for _ in 1:missing_lengths])
+		centers = [[(j+0.5)*lengths[i]/volumes[i] for j in 0:volumes[i]-1] for i in 1:3]
+		
+		centers_and_boundaries = [copy(arr) for arr ∈ centers]
+		centers_and_boundaries = [insert!(arr,1,0) for arr ∈ centers_and_boundaries]
+		centers_and_boundaries = [insert!(arr,length(arr)+1,lengths[idx]) for (idx,arr) ∈ enumerate(centers_and_boundaries)]
+
+		deltas = [length(set_deltas(dom)) != 0 ? set_deltas(dom) : [dom[end]] for dom ∈ centers_and_boundaries]
+
+		faces = [vcat(0,  (coords[1:(end-1)] + coords[2:end])/2 ,  lengths[idx]) for (idx,coords) ∈ enumerate(centers)]
+
+		deltas_faces = get_deltas_faces(faces)
+		#grid_deltas, grid_coords, grid_faces = get_grids(deltas, centers, faces)
 		
 		return volumes, lengths, centers, centers_and_boundaries, deltas, faces, deltas_faces
 	end
@@ -302,7 +425,7 @@ module FVM
 					centers_and_boundaries[direction][2:end] - centers_and_boundaries[direction][1:end-1])
 			end
 		end
-		if orientation ∈ [:E, :S,:B]
+		if orientation ∈ [:E, :N, :T]
 			if reverse
 				deltas_centers_and_boundaries[axis] = /
 				deltas_centers_and_boundaries[axis][1:end-1]
@@ -324,19 +447,16 @@ module FVM
 	function get_deltas_faces_by_axis(mesh::Mesh, axis::Int=1)
 		faces = mesh.faces
 		
-		deltas_faces =  faces[axis][2:end] - faces[axis][1:end-1]
+		faces[axis][2:end] - faces[axis][1:end-1]
 	end
 
 
-	function get_array_before_area(mesh::Mesh, direction::Real, extended::Bool=false)
+	function get_array_before_area(mesh::Mesh, direction::Real)
 		perpendicular = [i for i ∈ 1:3 if i != direction]
 		num_boundaries = mesh.volumes[direction]
 
-		array = [idx ∈ perpendicular ? mesh.deltas_faces[idx] : ones(num_boundaries) for idx ∈ 1:3]
-		return array
+		[idx ∈ perpendicular ? mesh.deltas_faces[idx] : ones(num_boundaries) for idx ∈ 1:3]
 	end
-
-	md"## Coeficientes"
 
 	mutable struct Coefficients_1d
 		mesh::Mesh
@@ -405,22 +525,22 @@ module FVM
 		dim = sum(mesh.volumes .!= 1)
 		vols = mesh.volumes
 
-		aP = zeros(vols[1], vols[2], vols[3])
-		aW = zeros(vols[1], vols[2], vols[3])
-		aE = zeros(vols[1], vols[2], vols[3])
-		Su = zeros(vols[1], vols[2], vols[3])
+		aP   = zeros(vols[1], vols[2], vols[3])
+		aW   = zeros(vols[1], vols[2], vols[3])
+		aE   = zeros(vols[1], vols[2], vols[3])
+		Su   = zeros(vols[1], vols[2], vols[3])
 		Sp_a = zeros(vols[1], vols[2], vols[3])
 		Sp_d = zeros(vols[1], vols[2], vols[3])
-		bW = zeros(vols[1], vols[2], vols[3]) # Aquí la contribuciones de la serie de Taylor para la condición de frontera
-		bE = zeros(vols[1], vols[2], vols[3])
-		aWW = zeros(vols[1], vols[2], vols[3]) # Aquí depositaremos lo de la advección a segundo orden
-		aEE = zeros(vols[1], vols[2], vols[3])
+		bW   = zeros(vols[1], vols[2], vols[3]) # Aquí la contribuciones de la serie de Taylor para la condición de frontera
+		bE   = zeros(vols[1], vols[2], vols[3])
+		aWW  = zeros(vols[1], vols[2], vols[3]) # Aquí depositaremos lo de la advección a segundo orden
+		aEE  = zeros(vols[1], vols[2], vols[3])
 
 		if dim > 1
-			aN = zeros(vols[1], vols[2], vols[3])
-			aS = zeros(vols[1], vols[2], vols[3])
-			bN = zeros(vols[1], vols[2], vols[3])
-			bS = zeros(vols[1], vols[2], vols[3])
+			aN  = zeros(vols[1], vols[2], vols[3])
+			aS  = zeros(vols[1], vols[2], vols[3])
+			bN  = zeros(vols[1], vols[2], vols[3])
+			bS  = zeros(vols[1], vols[2], vols[3])
 			aNN = zeros(vols[1], vols[2], vols[3])
 			aSS = zeros(vols[1], vols[2], vols[3])
 		end
@@ -455,8 +575,6 @@ module FVM
 		coeff.Su += source*(x*y*z)
 	end
 
-	md"## Difusión"
-
 
 	mutable struct Diffusion
 		coeff
@@ -475,7 +593,7 @@ module FVM
 	end
 
 	function grid_div_delta(gridmesh::Array, list::Array, axis::Int)
-		gridmesh_copy = ones(size(gridmesh))
+		#gridmesh_copy = ones(size(gridmesh))
 		for idx_z ∈ 1:size(gridmesh)[3]
 			for idx_y ∈ 1:size(gridmesh)[2]
 				for idx_x ∈ 1:size(gridmesh)[1]
@@ -499,8 +617,7 @@ module FVM
 		return gridmesh
 	end
 
-	function get_basic_diffusion_coef(diff::Diffusion, direction::Symbol,
-			what_dimension::Int, limit::Int)
+	function get_basic_diffusion_coef(diff::Diffusion, direction::Symbol, what_dimension::Int)
 		coeff = diff.coeff
 		mesh = coeff.mesh
 		faces = mesh.faces[what_dimension]
@@ -543,7 +660,7 @@ module FVM
 		mesh = diff.coeff.mesh
 		centers = mesh.centers
 		# Para obtener el arreglo con las Γ's
-		λ₁(x, d) = d ∈ [:E,:S,:B] ? x[2:end] : x[1:end-1]
+		λ₁(x, d) = d ∈ [:E,:N,:T] ? x[2:end] : x[1:end-1]
 		coords_align = [i!=what_dimension ? var : λ₁(faces, direction) for (i, var) ∈ enumerate(centers)]
 		# Esto sí es un meshgrid 
 		Γ = diff.Γ(coords_align[1], coords_align[2], coords_align[3])
@@ -567,7 +684,7 @@ module FVM
 		
 		# Le pones un cero en la dirección en donde le estamos mochando un pedazo
 		Γ_bar = zeros(size(Γ))
-		λ₂(d, idx) = d ∈ [:E,:S,:B] ? (1:(size(Γ_bar)[idx]-1)) : (2:size(Γ_bar)[idx])
+		λ₂(d, idx) = d ∈ [:E,:N,:T] ? (1:(size(Γ_bar)[idx]-1)) : (2:size(Γ_bar)[idx])
 		coord₃ = [idx!=what_dimension ? (:) : λ₂(direction, idx)  for idx ∈ 1:3]
 		
 		Γ_bar[coord₃[1], coord₃[2], coord₃[3]] = Γ_mean
@@ -586,7 +703,6 @@ module FVM
 		dict_cond = Dict(:I=>0, :N=>0, :D=>1)
 		for tag_b ∈ keys(tags_boundaries)
 			if collect(keys(tags_boundaries[tag_b]["frontera"]))[1] == direction
-				println(collect(keys(tags_boundaries[tag_b]["cond"])))
 				cond = collect(keys(tags_boundaries[tag_b]["cond"]))[1]
 				push!(condition_mask, dict_cond[cond])
 				push!(condition_mask_type, cond)
@@ -600,15 +716,15 @@ module FVM
 			array_before_boundary_area::Array, δ::Array)
 		ba = [copy(array) for array ∈ array_before_boundary_area]
 
-		λ_area(d, idx) = d ∈ [:E,:S,:B] ? (length(ba[idx]):length(ba[idx])) : (1:1)
+		λ_area(d, idx) = d ∈ [:E, :N, :T] ? (length(ba[idx]):length(ba[idx])) : (1:1)
 		coord_area = [idx!=what_dimension ? (:) : λ_area(direction, idx) for idx ∈ 1:3]
 		ba = [ba[idx][coord_area[idx]] for idx in 1:3]
 
-		λ(d, idx) = d in [:E,:S,:B] ? (length(Γ[idx]):length(Γ[idx])) : (1:1)
+		λ(d, idx) = d in [:E, :N, :T] ? (length(Γ[idx]):length(Γ[idx])) : (1:1)
 		coord = [idx!=what_dimension ? (:) : λ(direction, idx) for idx ∈ 1:3]
 		Γ_bound = Γ[coord[1], coord[2], coord[3]]
 		
-		λ_1(d, idx) = d ∈ [:E,:S,:B] ? ((size(Γ)[idx]-1):(size(Γ)[idx]-1)) : 2:2
+		λ_1(d, idx) = d ∈ [:E, :N, :T] ? ((size(Γ)[idx]-1):(size(Γ)[idx]-1)) : 2:2
 		coord_1 = [idx!=what_dimension ? (:) : λ_1(direction, idx) for idx in 1:3]
 		Γ_bound_next = Γ[coord_1[1], coord_1[2], coord_1[3]]
 
@@ -675,12 +791,12 @@ module FVM
 		ba = copy(array_before_areas)
 		condition_mask = reshape_boundary(condition_mask, diff, what_dimension)
 
-		λ_area(d, idx) = d ∈ [:E,:S,:B] ? (length(ba[idx]):length(ba[idx])) : (1:1)
+		λ_area(d, idx) = d ∈ [:E, :N, :T] ? (length(ba[idx]):length(ba[idx])) : (1:1)
 		coord_area = [idx!=what_dimension ? (:) : λ_area(direction,idx) for idx ∈ 1:3]
 		ba = [ba[idx][coord_area[idx]] for idx ∈ 1:3]
 		su = ba
 
-		λ(d, idx) = d ∈ [:E,:S,:B] ? (length(su[idx])) : 1
+		λ(d, idx) = d ∈ [:E, :N, :T] ? (length(su[idx])) : 1
 		coord = [idx!=what_dimension ? (:) : λ(direction, idx) for idx ∈ 1:3]
 		tmp_su = [su[idx][coord[idx]] for idx ∈ 1:3]
 		
@@ -701,7 +817,7 @@ module FVM
 		condition_mask = []
 		counter = 1
 		Γ_vcat = vcat(Γ...)
-		for (idx, tag_b) ∈ enumerate(keys(tags_boundaries))
+		for tag_b ∈ keys(tags_boundaries)
 			if collect(keys(tags_boundaries[tag_b]["frontera"]))[1] == direction
 				cond = collect(keys(tags_boundaries[tag_b]["cond"]))[1]
 				if cond == :I
@@ -726,7 +842,7 @@ module FVM
 		volumes = mesh.volumes
 		
 		zero = zeros(volumes[1], volumes[2], volumes[3])
-		f(i, d) = d ∈ [:E,:S,:B] ? volumes[i] : 1
+		f(i, d) = d ∈ [:E, :N, :T] ? volumes[i] : 1
 		coord = [idx!=what_dimension ? (:) : f(idx, direction) for idx ∈ 1:3]
 		
 		zero[coord[1], coord[2], coord[3]] = array
@@ -740,11 +856,11 @@ module FVM
 
 		"""
 		what_dimension, limit = 1,1
-		if direction ∈ [:E, :S, :B] limit = -1 end
+		if direction ∈ [:E, :N, :T] limit = -1 end
 		if direction ∈ [:N, :S] what_dimension = 2
 		elseif direction ∈ [:T, :B] what_dimension = 3
 		end
-		get_basic_diffusion_coef(diff, direction, what_dimension, limit)
+		get_basic_diffusion_coef(diff, direction, what_dimension)
 	end
 
 
@@ -773,7 +889,7 @@ module FVM
 		
 		if dim > 1
 			north_diff, sp_n, su_n, bound_term_n = get_diffusion_coef(diffusion, :N)
-			south_diff, sp_s, su_s, bound_term_s = get_diffusion_coef(diffusion,  :S)
+			south_diff, sp_s, su_s, bound_term_s = get_diffusion_coef(diffusion, :S)
 
 			coeff.aN -= north_diff
 			coeff.aS -= south_diff
@@ -784,26 +900,24 @@ module FVM
 			coeff.aP -= -north_diff - south_diff
 			coeff.aS += coeff.bN
 			coeff.aN += coeff.bS;
-		end
 
-		if dim == 3
-			top_diff, sp_t, su_t, bound_term_t = get_diffusion_coef(diffusion, :T)
-			bottom_diff, sp_b, su_b, bound_term_b = get_diffusion_coef(diffusion, :B)
+            if dim == 3
+                top_diff, sp_t, su_t, bound_term_t = get_diffusion_coef(diffusion, :T)
+                bottom_diff, sp_b, su_b, bound_term_b = get_diffusion_coef(diffusion, :B)
 
-			coeff.aT -= top_diff
-			coeff.aB -= bottom_diff
-			coeff.bT -= bound_term_t
-			coeff.bB -= bound_term_b
-			coeff.Sp_d -= sp_t + sp_b
-			coeff.Su += su_t + su_b
-			coeff.aP -= -top_diff - bottom_diff
-			coeff.aB += coeff.bT
-			coeff.aT += coeff.bB
-		coeff.aP -= coeff.Sp_d;
-		end
+                coeff.aT -= top_diff
+                coeff.aB -= bottom_diff
+                coeff.bT -= bound_term_t
+                coeff.bB -= bound_term_b
+                coeff.Sp_d -= sp_t + sp_b
+                coeff.Su += su_t + su_b
+                coeff.aP -= -top_diff - bottom_diff
+                coeff.aB += coeff.bT
+                coeff.aT += coeff.bB
+            end
+        end
+        coeff.aP -= coeff.Sp_d;
 	end
-
-	md"## Sistema de ecuaciones"
 
 	mutable struct EqSystem
 		A
@@ -821,7 +935,7 @@ module FVM
 		elseif dim > 1
 			aN, aS = coeff.aN, coeff.aS
 			if dim == 2
-				A = get_matrix_A(aP, aW, aE, aN, aS)
+				A = get_matrix_A(aP, aW, aE, aN, aS, volumes)
 			elseif dim == 3	
 				aT, aB = coeff.aT, coeff.aB
 				A = get_matrix_A(aP, aW, aE, aN, aS, aT, aB, volumes)
@@ -829,9 +943,9 @@ module FVM
 		end
 	    
 	    Su = coeff.Su
-		b = get_vector_b(Su)
+		b = get_vector_b(Su, dim)
 		
-		eq_system = EqSystem(A, b)
+		EqSystem(A, b)
 	end
 	    
 	    
@@ -847,14 +961,38 @@ module FVM
 		return A
 	end
 		
-	function get_matrix_A(aP::Array, aW::Array, aE::Array, aN::Array, aS::Array)
-		aP = [(aP...)...]
+	# function get_matrix_A(aP::Array, aW::Array, aE::Array, aN::Array, aS::Array, volumes::Array)
+	# 	aP = [(dropdims(aP;dims=3)'...)...]
+	#     A = get_diag(aP)
+    #     @show aN
+    #     @show aS
+    #     @show [(dropdims(aN;dims=3)'...)...]
+    #     @show [(dropdims(aS;dims=3)'...)...]
+    #     @show [(aN...)...]
+    #     @show [(aS...)...]
+	# 	aN = [(dropdims(aN;dims=3)'...)...][2:end]
+	# 	aS = [(dropdims(aS;dims=3)'...)...][1:(end-1)]
+
+    #     @show aN
+    #     @show aS
+	# 	aW = [(dropdims(aW;dims=3)'...)...][(volumes[2]+1):end]
+	# 	aE = [(dropdims(aE;dims=3)'...)...][1:(end-volumes[2])]
+
+	# 	A += get_diag(aS, -1) + get_diag(aN, 1) + get_diag(aE, volumes[2]) + get_diag(aW, -volumes[2])
+	# 	return A
+	# end
+
+    function get_matrix_A(aP::Array, aW::Array, aE::Array, aN::Array, aS::Array, volumes::Array)
+		aP = [(dropdims(aP;dims=3)'...)...]
 	    A = get_diag(aP)
-		aN = [(aN...)...][2:end]
-		aS = [(aS...)...][1:(end-1)]
-		aW = [(aW...)...][volumes[2]:end]
-		aE = [(aE...)...][1:(end-volumes[2])]
-		A += get_diag(aN, -1) + get_diag(aS, 1) + get_diag(aE, volumes[2]) + get_diag(aW, -volumes[2])
+
+		aN = [(dropdims(aN;dims=3)'...)...][1:(end-1)]
+		aS = [(dropdims(aS;dims=3)'...)...][2:end]
+
+		aW = [(dropdims(aW;dims=3)'...)...][(volumes[2]+1):end]
+		aE = [(dropdims(aE;dims=3)'...)...][1:(end-volumes[2])]
+
+		A += get_diag(aS, -1) + get_diag(aN, 1) + get_diag(aE, volumes[2]) + get_diag(aW, -volumes[2])
 		return A
 	end
 
@@ -862,15 +1000,15 @@ module FVM
 				aN::Array{Float64, 3}, aS::Array{Float64, 3}, aT::Array{Float64, 3}, aB::Array{Float64, 3}, volumes::Array)
 		aP = [(aP...)...]
 	    A = get_diag(aP)
-		aT = [(aT...)...][2:end]
-		aB = [(aB...)...][1:(end-1)]
+		aT = [(aT...)...][1:(end-1)]
+		aB = [(aB...)...][2:end]
 		
-		aN = [(aN...)...][(volumes[2]+1):end]
-		aS = [(aS...)...][1:(end-volumes[2])]
+		aN = [(aN...)...][1:(end-volumes[2])]
+		aS = [(aS...)...][(volumes[2]+1):end]
 		
 		aW = [(aW...)...][((volumes[2]*volumes[3])+1):end]
 		aE = [(aE...)...][1:(end-volumes[2]*volumes[3])]
-		A += get_diag(aT, -1) + get_diag(aB, 1) + get_diag(aN, -volumes[2]) + get_diag(aS, volumes[2]) + get_diag(aW, -volumes[2]*volumes[3]) + get_diag(aE, volumes[2]*volumes[3])
+		A += get_diag(aB, -1) + get_diag(aT, 1) + get_diag(aS, -volumes[2]) + get_diag(aN, volumes[2]) + get_diag(aW, -volumes[2]*volumes[3]) + get_diag(aE, volumes[2]*volumes[3])
 	    return A
 	end
 			
@@ -889,12 +1027,16 @@ module FVM
 	end
 
 
-	function get_vector_b(Su)
+	function get_vector_b(Su, dims)
 	    """
 	    Método para obtener el vector b, de la ecuación Ax = b, a partir del arreglo Su construido anteriormente
 	    """
-	    b = [(Su...)...]
-	    return b
+        if dims == 2
+            #return [(dropdims(Su;dims=3)'...)...]
+            return [(Su...)...]
+        elseif dims == 3
+            return [(Su...)...]
+        end
 	end
 			
 			
@@ -916,12 +1058,28 @@ module FVM
 	    return solve(A, b)
 	end
 	
-	function plot_solution(solution::Array, mesh::Mesh)
+    function plot_solution(solution::Array, mesh::Mesh)
+        dims = sum(mesh.volumes .!= 1)
+		if dims == 2
+			plot2d(solution, mesh)
+		elseif dims == 3
+			plot3d(solution, mesh)
+		end
+    end
+
+	function plot2d(solution::Array, mesh::Mesh)
 		(X,Y,Z) = mesh.centers
-		coordinates = [[x,y,z] for x ∈ X, y ∈ Y,  z ∈ Z]
+		coordinates = [coord for (idx, coord) in enumerate([X,Y,Z]) if mesh.volumes[idx] > 1]
+		heatmap(coordinates[1], coordinates[2], reshape(solution, length(coordinates[1]),length(coordinates[2]))')
+	end
+
+	function plot3d(solution::Array, mesh::Mesh)
+		plotly()
+		(X,Y,Z) = mesh.centers
+		coordinates = [[x,y,z] for x ∈ X, y ∈ Y, z ∈ Z]
 		x = [[coordinate[1] for coordinate ∈ coordinates]...]
 		y = [[coordinate[2] for coordinate ∈ coordinates]...]
 		z = [[coordinate[3] for coordinate ∈ coordinates]...]
-		scatter(x,y,z, marker_z=solution, color=:plasma)
-    end
+		scatter(x,y,z, marker_z=solution[1:end, end:-1:1, end:-1:1], color=:plasma)
+	end
 end
